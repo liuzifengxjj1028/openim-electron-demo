@@ -22,6 +22,7 @@ export const useConversationStore = create<ConversationStore>()((set, get) => ({
   unReadCount: 0,
   currentGroupInfo: undefined,
   currentMemberInGroup: undefined,
+  initialUnreadCount: 0,
   getConversationListByReq: async (isOffset?: boolean) => {
     let tmpConversationList = [] as ConversationItem[];
     try {
@@ -78,6 +79,7 @@ export const useConversationStore = create<ConversationStore>()((set, get) => ({
         quoteMessage: undefined,
         currentGroupInfo: undefined,
         currentMemberInGroup: undefined,
+        initialUnreadCount: 0,
       }));
       return;
     }
@@ -85,6 +87,13 @@ export const useConversationStore = create<ConversationStore>()((set, get) => ({
 
     const toggleNewConversation =
       conversation.conversationID !== prevConversation?.conversationID;
+
+    // 在会话切换时，立即保存未读数（在SDK标记已读之前）
+    if (toggleNewConversation) {
+      console.log("切换会话，保存初始未读数:", conversation.unreadCount);
+      set(() => ({ initialUnreadCount: conversation.unreadCount }));
+    }
+
     if (toggleNewConversation && isGroupSession(conversation.conversationType)) {
       get().getCurrentGroupInfoByReq(conversation.groupID);
       await get().getCurrentMemberInGroupByReq(conversation.groupID);
@@ -154,6 +163,7 @@ export const useConversationStore = create<ConversationStore>()((set, get) => ({
       currentGroupInfo: undefined,
       currentMemberInGroup: undefined,
       quoteMessage: undefined,
+      initialUnreadCount: 0,
     }));
   },
 }));

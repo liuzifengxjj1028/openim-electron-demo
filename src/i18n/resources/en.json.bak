@@ -291,8 +291,6 @@
     "close": "Close",
     "finder": "View",
     "blackList": "Contact Blacklist",
-    "timezoneSettings": "Timezone Settings",
-    "timezoneSettingsDesc": "Select the timezone you want to display to other users. When the timezone is changed, others will see the current time in your timezone.",
     "oldPassword": "Old Password:",
     "newPassword": "New Password:",
     "confirmPassword": "Confirm Password:",
@@ -383,9 +381,7 @@
     "forbidAddMember": "Forbidden to add group members as friends",
     "applyNeedInvite": "Group member invitation doesn't need verification",
     "applyNeedVerification": "Verification message required",
-    "applyAll": "Allow everyone to join the group",
-    "localTime": "Local Time",
-    "contactLocalTime": "Contact Local Time"
+    "applyAll": "Allow everyone to join the group"
   },
   "empty": {
     "noMoments": "No moments available",

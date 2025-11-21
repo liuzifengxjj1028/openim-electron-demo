@@ -27,6 +27,13 @@ const contactRoutes = [
       return { Component: NewFriends };
     },
   },
+  {
+    path: "search",
+    async lazy() {
+      const { SearchResults } = await import("@/pages/contact/searchResults");
+      return { Component: SearchResults };
+    },
+  },
 ];
 
 export default contactRoutes;

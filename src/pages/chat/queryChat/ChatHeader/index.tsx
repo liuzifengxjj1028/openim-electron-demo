@@ -89,6 +89,14 @@ const ChatHeader = () => {
     }
   };
 
+  const openGroupMemberList = () => {
+    if (groupSettingRef.current) {
+      groupSettingRef.current.openOverlay();
+      // 通知 GroupSetting 直接显示成员列表
+      emit("OPEN_GROUP_MEMBER_LIST");
+    }
+  };
+
   const isSingleSession = currentConversation?.conversationType === SessionType.Single;
   const isGroupSession = currentConversation?.conversationType === SessionType.Group;
 
@@ -100,24 +108,29 @@ const ChatHeader = () => {
             src={currentConversation?.faceURL}
             text={currentConversation?.showName}
             isgroup={Boolean(currentConversation?.groupID)}
+            userID={currentConversation?.userID}
           />
           <div
             className={clsx(
-              "ml-3 flex !h-10.5 flex-1 flex-col justify-between overflow-hidden",
+              "ml-3 flex !h-10.5 flex-1 flex-col justify-center overflow-hidden",
             )}
           >
             <div className="truncate text-base font-semibold">
               {currentConversation?.showName}
             </div>
             {isGroupSession && currentUserIsInGroup && (
-              <div className="flex items-center text-xs text-[var(--sub-text)]">
+              <div
+                className="flex items-center text-xs text-[var(--sub-text)] cursor-pointer hover:text-[var(--primary-active)]"
+                onClick={openGroupMemberList}
+                title={t("placeholder.viewMembers")}
+              >
                 <img width={20} src={group_member} alt="member" />
                 <span>{currentGroupInfo?.memberCount}</span>
               </div>
             )}
           </div>
         </div>
-        <div className="mr-5 flex">
+        <div className="mr-5 flex items-center">
           {menuList.map((menu) => {
             if (menu.idx === 1 && (isSingleSession || (!inGroup && !isSingleSession))) {
               return null;

@@ -105,6 +105,7 @@ const SingleSetting: ForwardRefRenderFunction<OverlayVisibleHandle, unknown> = (
           <OIMAvatar
             src={currentConversation?.faceURL}
             text={currentConversation?.showName}
+            userID={currentConversation?.userID}
           />
           <div className="ml-3">{currentConversation?.showName}</div>
         </div>

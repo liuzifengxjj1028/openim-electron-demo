@@ -89,6 +89,7 @@ const ApplicationItem = ({
             src={getAvatarUrl()}
             text={getTitle()}
             isgroup={isGroup && !isRecv}
+            userID={isGroup ? (isRecv ? source.userID : undefined) : (isRecv ? source.fromUserID : source.toUserID)}
             onClick={tryShowCard}
           />
           <div className="ml-3">

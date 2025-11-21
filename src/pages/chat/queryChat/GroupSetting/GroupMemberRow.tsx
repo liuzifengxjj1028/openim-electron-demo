@@ -63,7 +63,7 @@ const GroupMemberRow = ({
             className={styles["member-item"]}
             onClick={() => window.userClick(member.userID, member.groupID)}
           >
-            <OIMAvatar src={member.faceURL} text={member.nickname} size={36} />
+            <OIMAvatar src={member.faceURL} text={member.nickname} size={36} userID={member.userID} />
             <div className="mt-2 min-h-[16px] max-w-full truncate text-xs">
               {member.nickname}
             </div>

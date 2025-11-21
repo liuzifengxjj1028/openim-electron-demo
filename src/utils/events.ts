@@ -9,6 +9,8 @@ import { InviteData } from "@/pages/common/RtcCallModal/data";
 
 type EmitterEvents = {
   OPEN_USER_CARD: OpenUserCardParams;
+  CLOSE_USER_CARD: void;
+  CANCEL_CLOSE_USER_CARD: void;
   OPEN_GROUP_CARD: GroupItem;
   OPEN_CHOOSE_MODAL: ChooseModalState;
   CHAT_LIST_SCROLL_TO_BOTTOM: void;
@@ -35,5 +37,7 @@ export type OpenUserCardParams = {
 const emitter = mitt<EmitterEvents>();
 
 export const emit = emitter.emit;
+export const on = emitter.on;
+export const off = emitter.off;
 
 export default emitter;

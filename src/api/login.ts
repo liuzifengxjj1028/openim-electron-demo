@@ -163,6 +163,7 @@ export interface BusinessUserInfo {
   allowBeep: BusinessAllowType;
   allowVibration: BusinessAllowType;
   globalRecvMsgOpt: MessageReceiveOptType;
+  timezone?: string; // IANA timezone identifier (e.g., "Asia/Shanghai")
 }
 
 export enum BusinessAllowType {
@@ -216,6 +217,7 @@ interface UpdateBusinessUserInfoParams {
   allowBeep: number;
   allowVibration: number;
   globalRecvMsgOpt: number;
+  timezone?: string; // IANA timezone identifier (e.g., "Asia/Shanghai")
 }
 
 export const updateBusinessUserInfo = async (

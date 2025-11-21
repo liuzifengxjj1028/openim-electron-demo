@@ -1,8 +1,9 @@
-import { Badge } from "antd";
+import { Badge, Input } from "antd";
 import clsx from "clsx";
 import i18n, { t } from "i18next";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { SearchOutlined } from "@ant-design/icons";
 
 import group_notifications from "@/assets/images/contact/group_notifications.png";
 import my_friends from "@/assets/images/contact/my_friends.png";
@@ -43,6 +44,7 @@ i18n.on("languageChanged", () => {
 
 const ContactSider = () => {
   const [selectIndex, setSelectIndex] = useState(2);
+  const [searchValue, setSearchValue] = useState("");
   const unHandleFriendApplicationCount = useContactStore(
     (state) => state.unHandleFriendApplicationCount,
   );
@@ -73,11 +75,31 @@ const ContactSider = () => {
     return 0;
   };
 
+  const handleSearch = (value: string) => {
+    setSearchValue(value);
+    if (value.trim()) {
+      navigate("/contact/search?q=" + encodeURIComponent(value));
+    } else {
+      // 当搜索框为空时，返回默认的联系人页面
+      navigate("/contact");
+    }
+  };
+
   return (
     <FlexibleSider needHidden={true}>
       <div className="h-full bg-white">
         <div className="pb-3 pl-5.5 pt-5.5 text-base font-extrabold">
           {t("placeholder.contact")}
+        </div>
+        <div className="mx-2 mb-3">
+          <Input
+            placeholder={t("placeholder.searchContact")}
+            prefix={<SearchOutlined />}
+            value={searchValue}
+            onChange={(e) => handleSearch(e.target.value)}
+            allowClear
+            onClear={() => handleSearch("")}
+          />
         </div>
         <ul>
           {Links.map((item, index) => {

@@ -48,11 +48,21 @@ const TopSearchBar = () => {
   const [actionVisible, setActionVisible] = useState(false);
   const [isSearchGroup, setIsSearchGroup] = useState(false);
   const [inviteData, setInviteData] = useState<InviteData>({} as InviteData);
+  const currentUserIDRef = useRef<string | undefined>();
 
   useEffect(() => {
     const userCardHandler = (params: OpenUserCardParams) => {
+      // 直接更新状态并打开
       setUserCardState({ ...params });
-      userCardRef.current?.openOverlay();
+      currentUserIDRef.current = params.userID;
+
+      // 始终确保overlay是打开的
+      if (!userCardRef.current?.isOverlayOpen) {
+        userCardRef.current?.openOverlay();
+      }
+    };
+    const closeUserCardHandler = () => {
+      userCardRef.current?.closeOverlay();
     };
     const chooseModalHandler = (params: ChooseModalState) => {
       setChooseModalState({ ...params });
@@ -94,12 +104,14 @@ const TopSearchBar = () => {
     };
 
     emitter.on("OPEN_USER_CARD", userCardHandler);
+    emitter.on("CLOSE_USER_CARD", closeUserCardHandler);
     emitter.on("OPEN_GROUP_CARD", openGroupCardWithData);
     emitter.on("OPEN_CHOOSE_MODAL", chooseModalHandler);
     emitter.on("OPEN_RTC_MODAL", callRtcHandler);
     IMSDK.on(CbEvents.OnRecvNewMessages, newMessageHandler);
     return () => {
       emitter.off("OPEN_USER_CARD", userCardHandler);
+      emitter.off("CLOSE_USER_CARD", closeUserCardHandler);
       emitter.off("OPEN_GROUP_CARD", openGroupCardWithData);
       emitter.off("OPEN_CHOOSE_MODAL", chooseModalHandler);
       emitter.off("OPEN_RTC_MODAL", callRtcHandler);
@@ -165,7 +177,7 @@ const TopSearchBar = () => {
         </Popover>
       </div>
       <WindowControlBar />
-      <UserCardModal ref={userCardRef} {...userCardState} />
+      <UserCardModal key={userCardState?.userID} ref={userCardRef} {...userCardState} />
       <GroupCardModal ref={groupCardRef} groupData={groupCardData} />
       <ChooseModal ref={chooseModalRef} state={chooseModalState} />
       <SearchUserOrGroup

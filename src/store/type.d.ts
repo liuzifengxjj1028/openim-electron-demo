@@ -36,6 +36,7 @@ export interface UserStore {
 export interface AppSettings {
   locale: LocaleString;
   closeAction: "miniSize" | "quit";
+  timezone?: string; // IANA timezone identifier (e.g., "Asia/Shanghai")
 }
 
 export type LocaleString = "zh-CN" | "en-US";
@@ -48,6 +49,7 @@ export interface ConversationStore {
   unReadCount: number;
   currentGroupInfo?: GroupItem;
   currentMemberInGroup?: GroupMemberItem;
+  initialUnreadCount: number; // 保存切换会话时的初始未读数
   getConversationListByReq: (
     isOffset?: boolean
   ) => Promise<boolean>;

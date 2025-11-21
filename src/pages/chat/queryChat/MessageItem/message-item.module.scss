@@ -1,8 +1,11 @@
 .message-container {
-  @apply flex flex-1 overflow-hidden;
+  @apply flex overflow-hidden;
+  max-width: 80%;
+  width: fit-content;
 
   .message-wrap {
-    @apply ml-3 flex flex-1 flex-col overflow-hidden;
+    @apply ml-3 flex flex-col overflow-hidden;
+    max-width: 100%;
 
     .message-profile {
       @apply mb-1 flex w-full text-xs;

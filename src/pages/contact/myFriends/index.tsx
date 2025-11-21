@@ -1,12 +1,14 @@
+import { SessionType } from "@openim/wasm-client-sdk";
 import { useRequest } from "ahooks";
 import { Empty, Spin } from "antd";
 import { useCallback, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { GroupedVirtuoso, GroupedVirtuosoHandle } from "react-virtuoso";
 
+import { useConversationToggle } from "@/hooks/useConversationToggle";
 import { useContactStore } from "@/store";
 import { formatContactsByWorker } from "@/utils/contactsFormat";
-import { emit } from "@/utils/events";
+import emitter, { emit } from "@/utils/events";
 
 import AlphabetIndex from "./AlphabetIndex";
 import FriendListItem from "./FriendListItem";
@@ -16,6 +18,9 @@ export const MyFriends = () => {
   const friendList = useContactStore((state) => state.friendList);
   const virtuoso = useRef<GroupedVirtuosoHandle>(null);
   const alphabetRef = useRef<{ updateCurrentLetter: (letter: string) => void }>(null);
+  const { toSpecifiedConversation } = useConversationToggle();
+  const currentOpenCardRef = useRef<string | null>(null);
+  const closeTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const { data: sectionData, cancel } = useRequest(
     () => formatContactsByWorker(friendList),
@@ -24,11 +29,23 @@ export const MyFriends = () => {
     },
   );
 
+  const cancelCloseUserCard = useCallback(() => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  }, []);
+
   useEffect(() => {
+    emitter.on("CANCEL_CLOSE_USER_CARD", cancelCloseUserCard);
     return () => {
       cancel();
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current);
+      }
+      emitter.off("CANCEL_CLOSE_USER_CARD", cancelCloseUserCard);
     };
-  }, []);
+  }, [cancelCloseUserCard]);
 
   const scrollToLetter = useCallback(
     (idx: number) => {
@@ -44,10 +61,35 @@ export const MyFriends = () => {
   );
 
   const showUserCard = useCallback((userID: string) => {
+    // 清除延迟关闭的定时器
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+
+    currentOpenCardRef.current = userID;
     emit("OPEN_USER_CARD", {
       userID,
     });
   }, []);
+
+  const closeUserCard = useCallback(() => {
+    // 延迟关闭，避免闪烁
+    closeTimerRef.current = setTimeout(() => {
+      currentOpenCardRef.current = null;
+      emit("CLOSE_USER_CARD");
+    }, 300);
+  }, []);
+
+  const toConversation = useCallback(
+    (userID: string) => {
+      toSpecifiedConversation({
+        sourceID: userID,
+        sessionType: SessionType.Single,
+      });
+    },
+    [toSpecifiedConversation],
+  );
 
   const determineCurrentGroup = (startIndex: number) => {
     if (!sectionData) return;
@@ -102,6 +144,8 @@ export const MyFriends = () => {
                   key={sectionData.totalList[index].userID}
                   friend={sectionData.totalList[index]}
                   showUserCard={showUserCard}
+                  toConversation={toConversation}
+                  closeUserCard={closeUserCard}
                 />
               );
             }}

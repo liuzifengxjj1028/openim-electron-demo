@@ -12,7 +12,13 @@ const require = createRequire(import.meta.url);
 
 // https://vitejs.dev/config/
 export default defineConfig(({ command }) => {
-  rmSync("dist-electron", { recursive: true, force: true });
+  // Only clean dist-electron if running in Electron mode
+  // For browser mode, skip this to prevent build-and-exit behavior
+  const isBrowserMode = process.env.BROWSER_MODE === "true";
+
+  if (!isBrowserMode) {
+    rmSync("dist-electron", { recursive: true, force: true });
+  }
 
   const sourcemap = command === "serve" || !!process.env.VSCODE_DEBUG;
 
@@ -31,26 +37,29 @@ export default defineConfig(({ command }) => {
     },
     plugins: [
       react(),
-      electron({
-        include: ["electron"],
-        transformOptions: {
-          sourcemap,
-        },
-        plugins: [
-          ...(!!process.env.VSCODE_DEBUG
-            ? [
-              // Will start Electron via VSCode Debug
-              customStart(() =>
-                console.log(
-                    /* For `.vscode/.debug.script.mjs` */ "[startup] Electron App",
+      // Disable Electron plugin in browser mode
+      ...(!isBrowserMode ? [
+        electron({
+          include: ["electron"],
+          transformOptions: {
+            sourcemap,
+          },
+          plugins: [
+            ...(!!process.env.VSCODE_DEBUG
+              ? [
+                // Will start Electron via VSCode Debug
+                customStart(() =>
+                  console.log(
+                      /* For `.vscode/.debug.script.mjs` */ "[startup] Electron App",
+                  ),
                 ),
-              ),
-            ]
-            : []),
-          // Allow use `import.meta.env.VITE_SOME_KEY` in Electron-Main
-          loadViteEnv(),
-        ],
-      }),
+              ]
+              : []),
+            // Allow use `import.meta.env.VITE_SOME_KEY` in Electron-Main
+            loadViteEnv(),
+          ],
+        })
+      ] : []),
       // legacy({
       //   targets: ["defaults", "not IE 11"],
       // }),

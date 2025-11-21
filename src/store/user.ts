@@ -5,7 +5,7 @@ import { BusinessUserInfo, getBusinessUserInfo } from "@/api/login";
 import { IMSDK } from "@/layout/MainContentWrap";
 import router from "@/routes";
 import { feedbackToast } from "@/utils/common";
-import { clearIMProfile, getLocale, setLocale } from "@/utils/storage";
+import { clearIMProfile, getLocale, getTimezone, setLocale, setTimezone } from "@/utils/storage";
 
 import { useContactStore } from "./contact";
 import { useConversationStore } from "./conversation";
@@ -21,6 +21,7 @@ export const useUserStore = create<UserStore>()((set, get) => ({
   appSettings: {
     locale: getLocale(),
     closeAction: "miniSize",
+    timezone: getTimezone(),
   },
   updateSyncState: (syncState: IMConnectState) => {
     set({ syncState });
@@ -56,6 +57,9 @@ export const useUserStore = create<UserStore>()((set, get) => ({
   updateAppSettings: (settings: Partial<AppSettings>) => {
     if (settings.locale) {
       setLocale(settings.locale);
+    }
+    if (settings.timezone) {
+      setTimezone(settings.timezone);
     }
     set((state) => ({ appSettings: { ...state.appSettings, ...settings } }));
   },

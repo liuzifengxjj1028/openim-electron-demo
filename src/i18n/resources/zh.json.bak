@@ -292,8 +292,6 @@
     "close": "关闭",
     "finder": "查看",
     "blackList": "通讯录黑名单",
-    "timezoneSettings": "时区设置",
-    "timezoneSettingsDesc": "选择您要显示给其他用户的时区。时区更改后，对方将看到您所在时区的当前时间。",
     "oldPassword": "原密码:",
     "newPassword": "新密码:",
     "confirmPassword": "确认密码:",
@@ -384,9 +382,7 @@
     "forbidAddMember": "不允许添加群成员为好友",
     "applyNeedInvite": "群成员邀请无需验证",
     "applyNeedVerification": "需要发送验证消息",
-    "applyAll": "允许所有人加群",
-    "localTime": "当地时间",
-    "contactLocalTime": "对方当地时间"
+    "applyAll": "允许所有人加群"
   },
   "empty": {
     "noMoments": "暂无动态",

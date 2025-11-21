@@ -118,6 +118,7 @@ export const ChooseContact: FC<ChooseContactProps> = ({
 }) => {
   const chooseBoxRef = useRef<ChooseBoxHandle>(null);
   const [loading, setLoading] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1); // 当前步骤：1=选择成员，2=填写群名称
   const [groupBaseInfo, setGroupBaseInfo] = useState({
     groupName: "",
     groupAvatar: "",
@@ -146,8 +147,14 @@ export const ChooseContact: FC<ChooseContactProps> = ({
 
   const confirmChoose = async () => {
     const choosedList = chooseBoxRef.current?.getCheckedList() ?? [];
-    if (!choosedList?.length && type !== "SELECT_USER")
-      return message.warning(t("toast.selectLeastOne"));
+    if (!choosedList?.length && type !== "SELECT_USER") {
+      message.warning(t("toast.selectLeastOne"));
+      // 如果是创建群组且在第二步，返回第一步让用户选择成员
+      if (type === "CRATE_GROUP" && currentStep === 2) {
+        setCurrentStep(1);
+      }
+      return;
+    }
 
     if (!groupBaseInfo.groupName.trim() && type === "CRATE_GROUP")
       return message.warning(t("toast.inputGroupName"));
@@ -163,7 +170,8 @@ export const ChooseContact: FC<ChooseContactProps> = ({
             });
             break;
           }
-          await IMSDK.createGroup({
+          // 创建群组
+          const { data: groupInfo } = await IMSDK.createGroup({
             groupInfo: {
               groupType: GroupType.WorkingGroup,
               groupName: groupBaseInfo.groupName,
@@ -172,6 +180,13 @@ export const ChooseContact: FC<ChooseContactProps> = ({
             memberUserIDs: choosedList.map((item) => item.userID!),
             adminUserIDs: [],
           });
+          // 创建成功后自动跳转到新群聊
+          if (groupInfo?.groupID) {
+            toSpecifiedConversation({
+              sourceID: groupInfo.groupID,
+              sessionType: SessionType.Group,
+            });
+          }
           break;
         case "INVITE_TO_GROUP":
           await IMSDK.inviteUserToGroup({
@@ -215,6 +230,21 @@ export const ChooseContact: FC<ChooseContactProps> = ({
       groupName: "",
       groupAvatar: "",
     });
+    setCurrentStep(1); // 重置到第1步
+  };
+
+  // 下一步：从选择成员进入填写群名称
+  const goToNextStep = () => {
+    const choosedList = chooseBoxRef.current?.getCheckedList() ?? [];
+    if (!choosedList?.length && type !== "SELECT_USER") {
+      return message.warning(t("toast.selectLeastOne"));
+    }
+    setCurrentStep(2);
+  };
+
+  // 上一步：从填写群名称返回选择成员
+  const goToPrevStep = () => {
+    setCurrentStep(1);
   };
 
   const customUpload = async ({ file }: { file: FileWithPath }) => {
@@ -242,41 +272,50 @@ export const ChooseContact: FC<ChooseContactProps> = ({
       </div>
       {type === "CRATE_GROUP" ? (
         <div className="px-6 pt-4">
-          <div className="mb-6 flex items-center">
-            <div className="min-w-[60px] font-medium">{t("placeholder.groupName")}</div>
-            <Input
-              placeholder={t("placeholder.pleaseEnter")}
-              maxLength={16}
-              spellCheck={false}
-              value={groupBaseInfo.groupName}
-              onChange={(e) =>
-                setGroupBaseInfo((state) => ({ ...state, groupName: e.target.value }))
-              }
-            />
-          </div>
-          <div className="mb-6 flex items-center">
-            <div className="min-w-[60px] font-medium">
-              {t("placeholder.groupAvatar")}
+          {/* 第1步：只显示选择群成员 */}
+          {currentStep === 1 && (
+            <div className="flex">
+              <div className="min-w-[60px] font-medium">
+                {t("placeholder.groupMember")}
+              </div>
+              <ChooseBox className={clsx("!m-0 !h-[60vh] flex-1")} ref={chooseBoxRef} />
             </div>
-            <div className="flex items-center">
-              <OIMAvatar src={groupBaseInfo.groupAvatar} isgroup />
-              <Upload
-                accept="image/*"
-                showUploadList={false}
-                customRequest={customUpload as any}
-              >
-                <span className="ml-3 cursor-pointer text-xs text-[var(--primary)]">
-                  {t("placeholder.clickToModify")}
-                </span>
-              </Upload>
-            </div>
-          </div>
-          <div className="flex">
-            <div className="min-w-[60px] font-medium">
-              {t("placeholder.groupMember")}
-            </div>
-            <ChooseBox className={clsx("!m-0 !h-[40vh] flex-1")} ref={chooseBoxRef} />
-          </div>
+          )}
+
+          {/* 第2步：只显示填写群名称和群头像 */}
+          {currentStep === 2 && (
+            <>
+              <div className="mb-6 flex items-center">
+                <div className="min-w-[60px] font-medium">{t("placeholder.groupName")}</div>
+                <Input
+                  placeholder={t("placeholder.pleaseEnter")}
+                  maxLength={16}
+                  spellCheck={false}
+                  value={groupBaseInfo.groupName}
+                  onChange={(e) =>
+                    setGroupBaseInfo((state) => ({ ...state, groupName: e.target.value }))
+                  }
+                />
+              </div>
+              <div className="mb-6 flex items-center">
+                <div className="min-w-[60px] font-medium">
+                  {t("placeholder.groupAvatar")}
+                </div>
+                <div className="flex items-center">
+                  <OIMAvatar src={groupBaseInfo.groupAvatar} isgroup />
+                  <Upload
+                    accept="image/*"
+                    showUploadList={false}
+                    customRequest={customUpload as any}
+                  >
+                    <span className="ml-3 cursor-pointer text-xs text-[var(--primary)]">
+                      {t("placeholder.clickToModify")}
+                    </span>
+                  </Upload>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       ) : (
         <ChooseBox
@@ -289,20 +328,61 @@ export const ChooseContact: FC<ChooseContactProps> = ({
         />
       )}
       <div className="flex justify-end px-9 py-6">
-        <Button
-          className="mr-6 border-0 bg-[var(--chat-bubble)] px-6"
-          onClick={closeOverlay}
-        >
-          {t("cancel")}
-        </Button>
-        <Button
-          className="px-6"
-          type="primary"
-          loading={loading}
-          onClick={confirmChoose}
-        >
-          {t("confirm")}
-        </Button>
+        {/* 对于创建群组：根据步骤显示不同按钮 */}
+        {type === "CRATE_GROUP" ? (
+          <>
+            {currentStep === 1 ? (
+              // 第1步：显示"取消"和"下一步"
+              <>
+                <Button
+                  className="mr-6 border-0 bg-[var(--chat-bubble)] px-6"
+                  onClick={closeOverlay}
+                >
+                  {t("cancel")}
+                </Button>
+                <Button className="px-6" type="primary" onClick={goToNextStep}>
+                  {t("nextStep") || "下一步"}
+                </Button>
+              </>
+            ) : (
+              // 第2步：显示"上一步"和"确认"
+              <>
+                <Button
+                  className="mr-6 border-0 bg-[var(--chat-bubble)] px-6"
+                  onClick={goToPrevStep}
+                >
+                  {t("prevStep") || "上一步"}
+                </Button>
+                <Button
+                  className="px-6"
+                  type="primary"
+                  loading={loading}
+                  onClick={confirmChoose}
+                >
+                  {t("confirm")}
+                </Button>
+              </>
+            )}
+          </>
+        ) : (
+          // 其他类型：保持原样
+          <>
+            <Button
+              className="mr-6 border-0 bg-[var(--chat-bubble)] px-6"
+              onClick={closeOverlay}
+            >
+              {t("cancel")}
+            </Button>
+            <Button
+              className="px-6"
+              type="primary"
+              loading={loading}
+              onClick={confirmChoose}
+            >
+              {t("confirm")}
+            </Button>
+          </>
+        )}
       </div>
     </>
   );

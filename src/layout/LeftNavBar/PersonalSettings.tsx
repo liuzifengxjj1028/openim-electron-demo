@@ -12,6 +12,7 @@ import { feedbackToast } from "@/utils/common";
 import { OverlayVisibleHandle, useOverlayVisible } from "../../hooks/useOverlayVisible";
 import { IMSDK } from "../MainContentWrap";
 import BlackList from "./BlackList";
+import TimezoneSettings from "./TimezoneSettings";
 
 const PersonalSettings: ForwardRefRenderFunction<OverlayVisibleHandle, unknown> = (
   _,
@@ -55,6 +56,7 @@ export const PersonalSettingsContent = ({
   const updateAppSettings = useUserStore((state) => state.updateAppSettings);
 
   const backListRef = useRef<OverlayVisibleHandle>(null);
+  const timezoneSettingsRef = useRef<OverlayVisibleHandle>(null);
 
   const localeChange = (checked: boolean, locale: LocaleString) => {
     if (!checked) return;
@@ -81,9 +83,14 @@ export const PersonalSettingsContent = ({
     backListRef.current?.openOverlay();
   };
 
+  const toTimezoneSettings = () => {
+    timezoneSettingsRef.current?.openOverlay();
+  };
+
   return (
     <div className="flex flex-col bg-[var(--chat-bubble)]">
       <BlackList ref={backListRef} />
+      <TimezoneSettings ref={timezoneSettingsRef} />
       <div className="app-drag flex items-center justify-between bg-[var(--gap-text)] p-5">
         <span className="text-base font-medium">{t("placeholder.accountSetting")}</span>
         <CloseOutlined
@@ -139,6 +146,14 @@ export const PersonalSettingsContent = ({
               </div>
             )}
           </div>
+        </div>
+        <Divider className="m-0 border-4 border-[var(--gap-text)]" />
+        <div
+          className="flex cursor-pointer items-center justify-between px-6 py-4"
+          onClick={toTimezoneSettings}
+        >
+          <div className="text-base font-medium">{t("placeholder.timezoneSettings")}</div>
+          <RightOutlined rev={undefined} />
         </div>
         <Divider className="m-0 border-4 border-[var(--gap-text)]" />
         <div

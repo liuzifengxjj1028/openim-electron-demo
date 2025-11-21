@@ -9,7 +9,7 @@ import emitter, { emit } from "@/utils/events";
 const START_INDEX = 10000;
 const SPLIT_COUNT = 20;
 
-export function useHistoryMessageList() {
+export function useHistoryMessageList(initialUnreadCount = 0) {
   const { conversationID } = useParams();
   const [loadState, setLoadState] = useState({
     initLoading: true,
@@ -73,8 +73,20 @@ export function useHistoryMessageList() {
   const { loading: moreOldLoading, runAsync: getMoreOldMessages } = useRequest(
     async (loadMore = true) => {
       const reqConversationID = conversationID;
+      // 初始加载时，根据未读消息数决定加载数量
+      // 确保加载足够的消息以包含所有未读消息
+      const loadCount = !loadMore && initialUnreadCount > SPLIT_COUNT
+        ? Math.max(SPLIT_COUNT, initialUnreadCount + 10)  // 多加载10条确保有上下文
+        : SPLIT_COUNT;
+
+      console.log("加载历史消息:", {
+        loadMore,
+        initialUnreadCount,
+        loadCount,
+      });
+
       const { data } = await IMSDK.getAdvancedHistoryMessageList({
-        count: SPLIT_COUNT,
+        count: loadCount,
         startClientMsgID: loadMore
           ? latestLoadState.current.messageList[0]?.clientMsgID
           : "",

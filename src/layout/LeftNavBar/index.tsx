@@ -231,7 +231,7 @@ const LeftNavBar = memo(() => {
           customRequest={customUpload as any}
         >
           <div className={styles["avatar-wrapper"]}>
-            <OIMAvatar src={selfInfo.faceURL} text={selfInfo.nickname} />
+            <OIMAvatar src={selfInfo.faceURL} text={selfInfo.nickname} userID={selfInfo.userID} />
             <div className={styles["mask"]}>
               <img src={change_avatar} width={19} alt="" />
             </div>
@@ -281,6 +281,7 @@ const LeftNavBar = memo(() => {
             className="mb-6 cursor-pointer"
             src={selfInfo.faceURL}
             text={selfInfo.nickname}
+            userID={selfInfo.userID}
           />
         </Popover>
 

@@ -71,7 +71,9 @@ const SearchUserOrGroup: ForwardRefRenderFunction<
         setLoading(false);
         if (
           !total ||
-          (users[0].userID !== keyword && users[0].phoneNumber !== keyword)
+          (users[0].userID !== keyword &&
+           users[0].phoneNumber !== keyword &&
+           users[0].nickname !== keyword)
         ) {
           message.warning(t("empty.noSearchResults"));
           return;

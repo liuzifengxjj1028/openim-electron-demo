@@ -1,4 +1,4 @@
-import { MessageItem as MessageItemType, MessageType } from "@openim/wasm-client-sdk";
+import { MessageItem as MessageItemType, MessageType, SessionType } from "@openim/wasm-client-sdk";
 import clsx from "clsx";
 import { FC, memo, useCallback, useRef, useState } from "react";
 
@@ -18,6 +18,7 @@ export interface IMessageItemProps {
   disabled?: boolean;
   conversationID?: string;
   messageUpdateFlag?: string;
+  isHighlight?: boolean;
 }
 
 const components: Record<number, FC<IMessageItemProps>> = {
@@ -30,6 +31,7 @@ const MessageItem: FC<IMessageItemProps> = ({
   disabled,
   isSender,
   conversationID,
+  isHighlight = false,
 }) => {
   const messageWrapRef = useRef<HTMLDivElement>(null);
   const [showMessageMenu, setShowMessageMenu] = useState(false);
@@ -41,11 +43,18 @@ const MessageItem: FC<IMessageItemProps> = ({
 
   const canShowMessageMenu = !disabled;
 
+  // 检查是否显示已读标记：只在单聊中显示，且消息已被阅读
+  const showReadIndicator = message.sessionType === SessionType.Single && message.isRead;
+
   return (
     <>
       <div
         id={`chat_${message.clientMsgID}`}
-        className={clsx("relative flex select-text px-5 py-3")}
+        className={clsx(
+          "relative flex w-full select-text px-5 py-3 transition-colors duration-300",
+          isSender && "justify-end",
+          isHighlight && styles["animate-container"]
+        )}
       >
         <div
           className={clsx(
@@ -57,7 +66,15 @@ const MessageItem: FC<IMessageItemProps> = ({
             size={36}
             src={message.senderFaceUrl}
             text={message.senderNickname}
+            userID={message.sendID}
           />
+
+          {/* 单聊已读标记 - 紧靠消息气泡 */}
+          {showReadIndicator && (
+            <div className="mx-1 flex items-center text-green-500">
+              <span className="text-base">✅</span>
+            </div>
+          )}
 
           <div className={styles["message-wrap"]} ref={messageWrapRef}>
             <div className={styles["message-profile"]}>

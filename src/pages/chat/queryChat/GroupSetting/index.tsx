@@ -1,8 +1,10 @@
 import { Drawer } from "antd";
 import { t } from "i18next";
-import { forwardRef, ForwardRefRenderFunction, memo, useRef, useState } from "react";
+import { forwardRef, ForwardRefRenderFunction, memo, useRef, useState, useEffect } from "react";
 
 import { OverlayVisibleHandle, useOverlayVisible } from "@/hooks/useOverlayVisible";
+import { useLatestCallback } from "@/hooks/useLatestCallback";
+import { on, off } from "@/utils/events";
 
 import GroupMemberList from "./GroupMemberList";
 import GroupMemberListHeader from "./GroupMemberListHeader";
@@ -19,6 +21,17 @@ const GroupSetting: ForwardRefRenderFunction<OverlayVisibleHandle, unknown> = (
   const closePreviewMembers = () => {
     setIsPreviewMembers(false);
   };
+
+  const openMemberList = useLatestCallback(() => {
+    setIsPreviewMembers(true);
+  });
+
+  useEffect(() => {
+    on("OPEN_GROUP_MEMBER_LIST", openMemberList);
+    return () => {
+      off("OPEN_GROUP_MEMBER_LIST", openMemberList);
+    };
+  }, []);
 
   return (
     <Drawer

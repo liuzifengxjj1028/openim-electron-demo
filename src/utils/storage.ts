@@ -31,6 +31,8 @@ export const setIMProfile = ({
 };
 
 export const setLocale = (locale: string) => localStorage.setItem("IM_LOCALE", locale);
+export const setTimezone = (timezone: string) =>
+  localStorage.setItem("IM_TIMEZONE", timezone);
 
 export const clearIMProfile = () => {
   localForage.removeItem("IM_TOKEN");
@@ -52,3 +54,7 @@ export const getLocale = (): LocaleString =>
   (localStorage.getItem("IM_LOCALE") as LocaleString) ||
   window.navigator.language ||
   "en-US";
+
+export const getTimezone = (): string =>
+  localStorage.getItem("IM_TIMEZONE") ||
+  Intl.DateTimeFormat().resolvedOptions().timeZone;

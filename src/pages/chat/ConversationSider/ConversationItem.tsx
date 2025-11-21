@@ -3,6 +3,7 @@ import type {
   ConversationItem as ConversationItemType,
   MessageItem,
 } from "@openim/wasm-client-sdk/lib/types/entity";
+import { GroupAtType } from "@openim/wasm-client-sdk";
 import { Badge } from "antd";
 import clsx from "clsx";
 import { t } from "i18next";
@@ -51,6 +52,15 @@ const ConversationItem = ({ isActive, conversation }: IConversationProps) => {
 
   const latestMessageTime = formatConversionTime(conversation.latestMsgSendTime);
 
+  // 判断是否显示@提醒标记
+  const showAtMark = useMemo(() => {
+    // 只有在有未读消息时才显示@标记
+    if (conversation.unreadCount === 0) return false;
+    // groupAtType 为 1（AtMe）或 3（AtAllAtMe）时显示@标记
+    return conversation.groupAtType === GroupAtType.AtMe ||
+           conversation.groupAtType === GroupAtType.AtAllAtMe;
+  }, [conversation.unreadCount, conversation.groupAtType]);
+
   return (
     <div
       className={clsx(
@@ -65,6 +75,7 @@ const ConversationItem = ({ isActive, conversation }: IConversationProps) => {
           src={conversation.faceURL}
           isgroup={Boolean(conversation.groupID)}
           text={conversation.showName}
+          userID={conversation.userID}
         />
       </Badge>
 
@@ -75,6 +86,12 @@ const ConversationItem = ({ isActive, conversation }: IConversationProps) => {
         </div>
 
         <div className="flex items-center">
+          {/* @提醒标记 */}
+          {showAtMark && (
+            <span className="mr-1 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded bg-[#1890ff] text-xs font-bold text-white">
+              @
+            </span>
+          )}
           <div className="flex min-h-[16px] flex-1 items-center overflow-hidden text-xs">
             <div
               className="truncate text-[rgba(81,94,112,0.5)]"
