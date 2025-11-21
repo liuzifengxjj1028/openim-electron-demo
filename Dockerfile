@@ -13,8 +13,18 @@ RUN npm install
 # 复制源代码
 COPY . .
 
-# 设置浏览器模式并构建
+# 声明构建参数 - 从 Railway 接收环境变量
+ARG VITE_CHAT_URL
+ARG VITE_API_URL
+ARG VITE_WS_URL
+
+# 设置环境变量供 Vite 构建使用
+ENV VITE_CHAT_URL=$VITE_CHAT_URL
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_WS_URL=$VITE_WS_URL
 ENV BROWSER_MODE=true
+
+# 构建
 RUN npm run build
 
 # 使用 Nginx 服务静态文件
