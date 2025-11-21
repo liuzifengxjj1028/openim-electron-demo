@@ -23,13 +23,17 @@ FROM nginx:alpine
 # 复制构建产物到 Nginx
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# 复制 Nginx 配置模板
+# 复制 Nginx 配置模板和启动脚本
 COPY nginx.conf /etc/nginx/templates/default.conf.template
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+
+# 设置脚本可执行权限
+RUN chmod +x /docker-entrypoint.sh
 
 # Railway 使用的端口
 ENV PORT=80
 
 EXPOSE $PORT
 
-# 使用 envsubst 替换模板中的变量，然后启动 Nginx
-CMD sh -c "envsubst '\$PORT' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"
+# 使用启动脚本
+CMD ["/docker-entrypoint.sh"]
