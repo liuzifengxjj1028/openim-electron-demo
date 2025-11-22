@@ -43,8 +43,8 @@ const MessageItem: FC<IMessageItemProps> = ({
 
   const canShowMessageMenu = !disabled;
 
-  // 检查是否显示已读标记：只在单聊中显示，且消息已被阅读
-  const showReadIndicator = message.sessionType === SessionType.Single && message.isRead;
+  // 检查是否显示已读标记：只在单聊中显示，且是自己发送的消息，且消息已被阅读
+  const showReadIndicator = isSender && message.sessionType === SessionType.Single && message.isRead;
 
   return (
     <>
@@ -69,14 +69,12 @@ const MessageItem: FC<IMessageItemProps> = ({
             userID={message.sendID}
           />
 
-          {/* 单聊已读标记 - 紧靠消息气泡 */}
-          {showReadIndicator && (
-            <div className="mx-1 flex items-center text-green-500">
-              <span className="text-base">✅</span>
-            </div>
-          )}
-
-          <div className={styles["message-wrap"]} ref={messageWrapRef}>
+          <div
+            className={clsx(
+              styles["message-wrap"]
+            )}
+            ref={messageWrapRef}
+          >
             <div className={styles["message-profile"]}>
               <div
                 title={message.senderNickname}
@@ -107,6 +105,13 @@ const MessageItem: FC<IMessageItemProps> = ({
                 disabled={false}
                 conversationID={conversationID}
               />
+
+              {/* 单聊已读标记 - 使用与MessageSuffix相同的样式，但距离气泡再近2px */}
+              {showReadIndicator && (
+                <div className={`${styles.suffix} !mr-[10px]`}>
+                  <span className="text-base text-green-500">✅</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

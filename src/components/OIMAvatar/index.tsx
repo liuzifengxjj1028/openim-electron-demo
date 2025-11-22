@@ -75,15 +75,13 @@ const OIMAvatar: React.FC<IOIMAvatarProps> = (props) => {
   }, [src, userID, bgColor, isgroup, imageLoadFailed]);
 
   const displayText = useMemo(() => {
-    // 检查是否有有效的图片URL
-    const hasValidSrc = src && src.trim() !== "";
-
-    // 如果没有头像图片（或图片加载失败），显示昵称的前3个字符
-    if ((!hasValidSrc || imageLoadFailed) && text && !isgroup) {
+    // 如果最终没有显示头像图片，则显示昵称的前3个字符
+    // 使用getAvatarUrl来判断是否真正显示图片，而不仅仅检查src是否存在
+    if (!getAvatarUrl && text && !isgroup) {
       return getAvatarText(text);
     }
     return text;
-  }, [src, text, isgroup, imageLoadFailed]);
+  }, [getAvatarUrl, text, isgroup]);
 
   const avatarProps = { ...props, isgroup: undefined, isnotification: undefined, userID: undefined };
 
