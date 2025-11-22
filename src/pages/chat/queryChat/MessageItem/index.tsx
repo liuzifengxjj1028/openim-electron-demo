@@ -106,9 +106,9 @@ const MessageItem: FC<IMessageItemProps> = ({
                 conversationID={conversationID}
               />
 
-              {/* 单聊已读标记 - 使用与MessageSuffix相同的样式，但距离气泡再近2px */}
+              {/* 单聊已读标记 - 使用与MessageSuffix相同的样式，距离气泡3px */}
               {showReadIndicator && (
-                <div className={`${styles.suffix} !mr-[10px]`}>
+                <div className={`${styles.suffix} !mr-[3px]`}>
                   <span className="text-base text-green-500">✅</span>
                 </div>
               )}

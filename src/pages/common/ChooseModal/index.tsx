@@ -272,15 +272,13 @@ export const ChooseContact: FC<ChooseContactProps> = ({
       </div>
       {type === "CRATE_GROUP" ? (
         <div className="px-6 pt-4">
-          {/* 第1步：只显示选择群成员 */}
-          {currentStep === 1 && (
-            <div className="flex">
-              <div className="min-w-[60px] font-medium">
-                {t("placeholder.groupMember")}
-              </div>
-              <ChooseBox className={clsx("!m-0 !h-[60vh] flex-1")} ref={chooseBoxRef} />
+          {/* 第1步：显示选择群成员 - 保持ChooseBox始终挂载，只是在第2步隐藏 */}
+          <div className={clsx("flex", currentStep === 2 && "hidden")}>
+            <div className="min-w-[60px] font-medium">
+              {t("placeholder.groupMember")}
             </div>
-          )}
+            <ChooseBox className={clsx("!m-0 !h-[60vh] flex-1")} ref={chooseBoxRef} />
+          </div>
 
           {/* 第2步：只显示填写群名称和群头像 */}
           {currentStep === 2 && (
