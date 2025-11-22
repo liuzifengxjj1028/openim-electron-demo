@@ -128,16 +128,37 @@ const Index: ForwardRefRenderFunction<CKEditorRef, CKEditorProps> = (
               feed: (queryText: string) => {
                 const feeds = mentionFeedsRef.current;
                 console.log("@触发，查询文本:", queryText, "成员列表数量:", feeds.length);
+
+                // 添加"所有人"选项
+                const allPeopleOption = {
+                  id: "AtAllTag",
+                  name: "所有人",
+                  avatar: "",
+                };
+
+                // 合并"所有人"选项和成员列表
+                const allFeeds = [allPeopleOption, ...feeds];
+
                 // 根据输入文本过滤成员列表
-                const results = feeds
-                  .filter((member) =>
-                    member.name.toLowerCase().includes(queryText.toLowerCase())
-                  )
-                  .map((member) => ({
-                    id: `@${member.name}`,
-                    text: member.name,
-                  }));
-                console.log("过滤后的结果:", results);
+                let filtered = allFeeds.filter((member) =>
+                  member.name.toLowerCase().includes(queryText.toLowerCase())
+                );
+
+                // 按照用户名首字母排序（中文按拼音首字母，英文按字母）
+                filtered.sort((a, b) => {
+                  // "所有人"始终排在第一位
+                  if (a.id === "AtAllTag") return -1;
+                  if (b.id === "AtAllTag") return 1;
+
+                  return a.name.localeCompare(b.name, 'zh-CN', { sensitivity: 'base' });
+                });
+
+                const results = filtered.map((member) => ({
+                  id: `@${member.name}`,
+                  userId: member.id,  // 保存用户ID
+                }));
+
+                console.log("过滤并排序后的结果:", results);
                 return results;
               },
               minimumCharacters: 0,

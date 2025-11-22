@@ -23,6 +23,7 @@ export interface IMessageItemProps {
 
 const components: Record<number, FC<IMessageItemProps>> = {
   [MessageType.TextMessage]: TextMessageRender,
+  [MessageType.AtTextMessage]: TextMessageRender,
   [MessageType.PictureMessage]: MediaMessageRender,
 };
 

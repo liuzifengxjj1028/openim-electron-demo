@@ -44,3 +44,31 @@ export const getCleanTextExceptImg = (html: string) => {
   const regWithoutHtmlExceptImg = /<(?!img\s*\/?)[^>]+>/gi;
   return html.replace(regWithoutHtmlExceptImg, "");
 };
+
+/**
+ * 从HTML中提取@mention信息
+ * @param html CKEditor生成的HTML内容
+ * @returns 包含被@的用户名列表
+ */
+export const extractMentions = (html: string): string[] => {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
+
+  // CKEditor的mention会生成<span class="mention" data-mention="@用户名">@用户名</span>
+  const mentionElements = doc.querySelectorAll('span.mention[data-mention]');
+
+  const mentions: string[] = [];
+  mentionElements.forEach((el) => {
+    const mention = el.getAttribute('data-mention');
+    if (mention) {
+      // 移除@符号，只保留用户名
+      const userName = mention.replace(/^@/, '');
+      mentions.push(userName);
+    }
+  });
+
+  console.log('[提取@信息] HTML:', html);
+  console.log('[提取@信息] 提取到的@用户名:', mentions);
+
+  return mentions;
+};

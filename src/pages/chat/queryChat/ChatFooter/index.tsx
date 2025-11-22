@@ -1,4 +1,5 @@
-import { SessionType } from "@openim/wasm-client-sdk";
+import { SessionType, CbEvents } from "@openim/wasm-client-sdk";
+import { GroupMemberItem, WSEvent } from "@openim/wasm-client-sdk/lib/types/entity";
 import { useLatest } from "ahooks";
 import { Button } from "antd";
 import { t } from "i18next";
@@ -6,7 +7,7 @@ import { forwardRef, ForwardRefRenderFunction, memo, useEffect, useState } from 
 
 import { BusinessUserInfo, getBusinessUserInfo } from "@/api/login";
 import CKEditor, { MentionFeed } from "@/components/CKEditor";
-import { getCleanText } from "@/components/CKEditor/utils";
+import { getCleanText, extractMentions } from "@/components/CKEditor/utils";
 import i18n from "@/i18n";
 import { IMSDK } from "@/layout/MainContentWrap";
 import { useConversationStore, useUserStore } from "@/store";
@@ -31,6 +32,7 @@ const ChatFooter: ForwardRefRenderFunction<unknown, unknown> = (_, ref) => {
   const [mentionFeeds, setMentionFeeds] = useState<MentionFeed[]>([]);
   const [otherUserInfo, setOtherUserInfo] = useState<BusinessUserInfo | null>(null);
   const latestHtml = useLatest(html);
+  const latestMentionFeeds = useLatest(mentionFeeds);
 
   const currentConversation = useConversationStore((state) => state.currentConversation);
   const isGroupSession = currentConversation?.conversationType === SessionType.Group;
@@ -61,7 +63,10 @@ const ChatFooter: ForwardRefRenderFunction<unknown, unknown> = (_, ref) => {
 
   // 获取群成员列表
   useEffect(() => {
+    console.log('[useEffect触发] isGroupSession:', isGroupSession, 'groupID:', currentConversation?.groupID);
+
     if (!isGroupSession || !currentConversation?.groupID) {
+      console.log('[useEffect] 清空mentionFeeds，原因：', !isGroupSession ? '不是群聊' : '没有groupID');
       setMentionFeeds([]);
       return;
     }
@@ -82,6 +87,7 @@ const ChatFooter: ForwardRefRenderFunction<unknown, unknown> = (_, ref) => {
         }));
 
         console.log("获取到的群成员列表:", feeds);
+        console.log('[setMentionFeeds] 设置mentionFeeds，数量:', feeds.length);
         setMentionFeeds(feeds);
       } catch (error) {
         console.error("获取群成员失败:", error);
@@ -89,6 +95,73 @@ const ChatFooter: ForwardRefRenderFunction<unknown, unknown> = (_, ref) => {
     };
 
     fetchGroupMembers();
+  }, [isGroupSession, currentConversation?.groupID]);
+
+  // 监听群成员变化,实时更新@列表
+  useEffect(() => {
+    if (!isGroupSession || !currentConversation?.groupID) {
+      return;
+    }
+
+    const groupID = currentConversation.groupID;
+
+    const handleGroupMemberAdded = ({ data }: WSEvent<GroupMemberItem>) => {
+      // 只处理当前群组的成员变化
+      if (data.groupID === groupID) {
+        console.log('[群成员增加]', data);
+        // 重新获取群成员列表
+        IMSDK.getGroupMemberList({
+          groupID,
+          filter: 0,
+          offset: 0,
+          count: 1000,
+        }).then(({ data }) => {
+          const feeds: MentionFeed[] = data.map((member) => ({
+            id: member.userID,
+            name: member.nickname || member.userID,
+            avatar: member.faceURL,
+          }));
+          console.log('[群成员增加后] 更新mentionFeeds，数量:', feeds.length);
+          setMentionFeeds(feeds);
+        }).catch((error) => {
+          console.error("重新获取群成员失败:", error);
+        });
+      }
+    };
+
+    const handleGroupMemberDeleted = ({ data }: WSEvent<GroupMemberItem>) => {
+      // 只处理当前群组的成员变化
+      if (data.groupID === groupID) {
+        console.log('[群成员减少]', data);
+        // 重新获取群成员列表
+        IMSDK.getGroupMemberList({
+          groupID,
+          filter: 0,
+          offset: 0,
+          count: 1000,
+        }).then(({ data }) => {
+          const feeds: MentionFeed[] = data.map((member) => ({
+            id: member.userID,
+            name: member.nickname || member.userID,
+            avatar: member.faceURL,
+          }));
+          console.log('[群成员减少后] 更新mentionFeeds，数量:', feeds.length);
+          setMentionFeeds(feeds);
+        }).catch((error) => {
+          console.error("重新获取群成员失败:", error);
+        });
+      }
+    };
+
+    // 注册事件监听
+    IMSDK.on(CbEvents.OnGroupMemberAdded, handleGroupMemberAdded);
+    IMSDK.on(CbEvents.OnGroupMemberDeleted, handleGroupMemberDeleted);
+
+    // 清理函数:组件卸载或群组变化时移除监听
+    return () => {
+      IMSDK.off(CbEvents.OnGroupMemberAdded, handleGroupMemberAdded);
+      IMSDK.off(CbEvents.OnGroupMemberDeleted, handleGroupMemberDeleted);
+    };
   }, [isGroupSession, currentConversation?.groupID]);
 
   const onChange = (value: string) => {
@@ -103,7 +176,73 @@ const ChatFooter: ForwardRefRenderFunction<unknown, unknown> = (_, ref) => {
       return;
     }
 
-    const messageData = (await IMSDK.createTextMessage(cleanText)).data;
+    // 提取@信息
+    const mentionedUserNames = extractMentions(latestHtml.current);
+
+    let messageData;
+
+    if (mentionedUserNames.length > 0) {
+      // 将用户名映射到用户ID
+      const atUserIDList: string[] = [];
+      const atUsersInfo: Array<{atUserID: string; groupNickname: string}> = [];
+      const currentMentionFeeds = latestMentionFeeds.current;
+
+      console.log('[映射调试] mentionedUserNames:', mentionedUserNames);
+      console.log('[映射调试] currentMentionFeeds:', currentMentionFeeds);
+
+      mentionedUserNames.forEach((userName) => {
+        if (userName === "所有人") {
+          // @所有人
+          atUserIDList.push("AtAllTag");
+          atUsersInfo.push({
+            atUserID: "AtAllTag",
+            groupNickname: "所有人"
+          });
+          console.log('[映射调试] 添加所有人: AtAllTag');
+        } else {
+          // 从mentionFeeds中查找对应的用户ID
+          const member = currentMentionFeeds.find((m) => m.name === userName);
+          console.log(`[映射调试] 查找用户 "${userName}":`, member);
+
+          if (member && member.id) {
+            atUserIDList.push(member.id);
+            atUsersInfo.push({
+              atUserID: member.id,
+              groupNickname: member.name
+            });
+            console.log(`[映射调试] 找到用户ID: ${member.id}`);
+          } else {
+            console.error(`[映射调试] 未找到用户 "${userName}" 的ID`);
+          }
+        }
+      });
+
+      console.log('[发送@消息]', {
+        text: cleanText,
+        mentionedUserNames,
+        atUserIDList,
+        atUsersInfo,
+      });
+
+      // 使用createTextAtMessage发送@消息
+      const result = await IMSDK.createTextAtMessage({
+        text: cleanText,
+        atUserIDList,
+        atUsersInfo,
+      });
+
+      console.log('[createTextAtMessage返回结果]', {
+        fullResult: result,
+        dataField: result.data,
+        dataType: typeof result.data
+      });
+
+      messageData = result.data;
+    } else {
+      // 普通文本消息
+      messageData = (await IMSDK.createTextMessage(cleanText)).data;
+    }
+
     setHtml("");
     sendMessage({ message: messageData });
   };

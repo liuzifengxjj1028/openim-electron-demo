@@ -56,10 +56,49 @@ const ConversationItem = ({ isActive, conversation }: IConversationProps) => {
   const showAtMark = useMemo(() => {
     // 只有在有未读消息时才显示@标记
     if (conversation.unreadCount === 0) return false;
-    // groupAtType 为 1（AtMe）或 3（AtAllAtMe）时显示@标记
+
+    // 如果 groupAtType 为 AtNormal(0)，肯定不显示@标记
+    if (conversation.groupAtType === GroupAtType.AtNormal) return false;
+
+    // 客户端二次验证:检查最新消息中的 atUserList 是否包含当前用户
+    // 这是为了修复服务端bug(服务端会给所有用户设置 groupAtType=1,即使他们没有被@)
+    try {
+      if (conversation.latestMsg) {
+        const latestMessage = JSON.parse(conversation.latestMsg) as MessageItem;
+
+        // 如果最新消息是@消息类型
+        if (latestMessage.atTextElem) {
+          const atUserList = latestMessage.atTextElem.atUserList || [];
+
+          // 检查是否 @所有人
+          const isAtAll = atUserList.includes('AtAllTag');
+
+          // 检查当前用户是否在 atUserList 中
+          const isAtMe = atUserList.includes(currentUser);
+
+          console.log('[会话@状态验证]', {
+            会话名称: conversation.showName,
+            groupAtType: conversation.groupAtType,
+            未读数: conversation.unreadCount,
+            当前用户ID: currentUser,
+            atUserList: atUserList,
+            isAtAll,
+            isAtMe,
+            最终显示: isAtAll || isAtMe
+          });
+
+          // 只有在真正被@的情况下才显示@标记
+          return isAtAll || isAtMe;
+        }
+      }
+    } catch (error) {
+      console.error('[会话@状态验证失败]', error);
+    }
+
+    // 如果解析失败或不是@消息,回退到原来的逻辑
     return conversation.groupAtType === GroupAtType.AtMe ||
            conversation.groupAtType === GroupAtType.AtAllAtMe;
-  }, [conversation.unreadCount, conversation.groupAtType]);
+  }, [conversation.unreadCount, conversation.groupAtType, conversation.latestMsg, currentUser]);
 
   return (
     <div
