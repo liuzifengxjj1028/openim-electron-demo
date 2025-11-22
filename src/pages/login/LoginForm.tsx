@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useLogin, useSendSms } from "@/api/login";
+import { checkDataConsistency } from "@/utils/dataConsistencyCheck";
 import {
   getEmail,
   getPhoneNumber,
@@ -64,9 +65,17 @@ const LoginForm = ({ loginMethod, setFormType, updateLoginMethod }: LoginFormPro
       setEmail(params.email);
     }
     login(params, {
-      onSuccess: (data) => {
+      onSuccess: async (data) => {
         const { chatToken, imToken, userID } = data.data;
         setIMProfile({ chatToken, imToken, userID });
+
+        // 登录成功后，检查数据一致性
+        try {
+          await checkDataConsistency();
+        } catch (error) {
+          console.error("数据一致性检查失败:", error);
+        }
+
         navigate("/chat");
       },
     });

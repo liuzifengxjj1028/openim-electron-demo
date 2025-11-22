@@ -97,11 +97,15 @@ const ChatFooter: ForwardRefRenderFunction<unknown, unknown> = (_, ref) => {
 
   const enterToSend = async () => {
     const cleanText = getCleanText(latestHtml.current);
-    const message = (await IMSDK.createTextMessage(cleanText)).data;
-    setHtml("");
-    if (!cleanText) return;
 
-    sendMessage({ message });
+    // 先验证内容是否为空，再执行后续操作
+    if (!cleanText || !cleanText.trim()) {
+      return;
+    }
+
+    const messageData = (await IMSDK.createTextMessage(cleanText)).data;
+    setHtml("");
+    sendMessage({ message: messageData });
   };
 
   return (

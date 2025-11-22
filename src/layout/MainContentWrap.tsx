@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { useConversationStore, useUserStore } from "@/store";
+import { checkDataConsistency } from "@/utils/dataConsistencyCheck";
 import { emit } from "@/utils/events";
 import { getIMToken, getIMUserID } from "@/utils/storage";
 
@@ -32,6 +33,13 @@ export const MainContentWrap = () => {
       if (!IMToken || !IMUserID) {
         navigate("/login");
         return;
+      }
+
+      // 用户已登录，检查数据一致性
+      try {
+        await checkDataConsistency();
+      } catch (error) {
+        console.error("数据一致性检查失败:", error);
       }
     };
 
