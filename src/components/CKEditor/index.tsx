@@ -154,9 +154,10 @@ const Index: ForwardRefRenderFunction<CKEditorRef, CKEditorProps> = (
                 });
 
                 // 返回对象数组格式，符合CKEditor Mention plugin要求
+                // id不包含@符号，避免与marker冲突
                 const results = filtered.map((member) => ({
-                  id: `@${member.name}`,
-                  text: member.name  // 显示文本不带@符号
+                  id: member.name,    // id不带@符号
+                  text: member.name   // 显示文本也不带@符号
                 }));
 
                 console.log("过滤并排序后的结果:", results);
