@@ -1,4 +1,4 @@
-# 使用 Node.js 构建
+# 使用 Node.js 构建 (Updated: 2025-11-23 to force rebuild for CKEditor)
 FROM node:18-alpine AS builder
 
 WORKDIR /app
