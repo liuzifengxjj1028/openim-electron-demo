@@ -1,7 +1,10 @@
-# 使用 Node.js 构建 (Updated: 2025-11-23 to force rebuild for CKEditor)
+# 使用 Node.js 构建 (Force rebuild - no cache)
 FROM node:18-alpine AS builder
 
 WORKDIR /app
+
+# 强制清除npm缓存并重新安装
+RUN npm cache clean --force
 
 # 安装构建依赖
 RUN apk add --no-cache python3 make g++ cmake
