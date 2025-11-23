@@ -103,3 +103,12 @@
 .ck-editor__top {
   display: none;
 }
+
+// Mention样式
+.ck-content .mention {
+  background-color: #e6f2ff;
+  color: #1890ff;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-weight: 500;
+}

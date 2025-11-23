@@ -15,6 +15,10 @@ export const getCleanText = (html: string) => {
   let text = replaceEmoji2Str(html);
   text = text.replace(/<\/p><p>/g, "\n");
   text = text.replace(/<br\s*[/]?>/gi, "\n");
+
+  // 保留 @mention 标记:将 <span class="mention" data-mention="@用户名">@用户名</span> 替换为 @用户名
+  text = text.replace(/<span class="mention"[^>]*data-mention="(@[^"]+)"[^>]*>[^<]*<\/span>/g, '$1');
+
   text = text.replace(/<[^>]+>/g, "");
   text = convertChar(text);
   text = decodeHtmlEntities(text);
