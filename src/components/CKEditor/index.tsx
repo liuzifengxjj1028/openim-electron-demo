@@ -153,7 +153,11 @@ const Index: ForwardRefRenderFunction<CKEditorRef, CKEditorProps> = (
                   return a.name.localeCompare(b.name, 'zh-CN', { sensitivity: 'base' });
                 });
 
-                const results = filtered.map((member) => `@${member.name}`);
+                // 返回对象数组格式，符合CKEditor Mention plugin要求
+                const results = filtered.map((member) => ({
+                  id: `@${member.name}`,
+                  text: member.name  // 显示文本不带@符号
+                }));
 
                 console.log("过滤并排序后的结果:", results);
                 return results;
