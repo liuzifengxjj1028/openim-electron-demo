@@ -153,10 +153,7 @@ const Index: ForwardRefRenderFunction<CKEditorRef, CKEditorProps> = (
                   return a.name.localeCompare(b.name, 'zh-CN', { sensitivity: 'base' });
                 });
 
-                const results = filtered.map((member) => ({
-                  id: `@${member.name}`,
-                  userId: member.id,  // 保存用户ID
-                }));
+                const results = filtered.map((member) => `@${member.name}`);
 
                 console.log("过滤并排序后的结果:", results);
                 return results;
