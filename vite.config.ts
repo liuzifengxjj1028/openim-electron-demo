@@ -35,6 +35,9 @@ export default defineConfig(({ command }) => {
         },
       },
     },
+    optimizeDeps: {
+      include: ["ckeditor5", "@ckeditor/ckeditor5-react"],
+    },
     plugins: [
       react(),
       // Disable Electron plugin in browser mode
