@@ -1,5 +1,5 @@
 import { ClockCircleOutlined } from "@ant-design/icons";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 interface UserTimezoneDisplayProps {
@@ -16,18 +16,30 @@ export const UserTimezoneDisplay = ({
 }: UserTimezoneDisplayProps) => {
   const { t } = useTranslation();
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [tickCount, setTickCount] = useState(0); // 添加一个计数器来强制更新
+
+  // 如果没有提供timezone，使用浏览器自动检测的时区
+  const effectiveTimezone = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   useEffect(() => {
+    console.log('[UserTimezoneDisplay] 组件挂载，启动定时器, timezone:', timezone);
     // 每秒更新一次时间
     const timer = setInterval(() => {
-      setCurrentTime(new Date());
+      const newTime = new Date();
+      console.log('[UserTimezoneDisplay] 定时器触发，更新时间:', newTime.toLocaleTimeString());
+      setCurrentTime(newTime);
+      setTickCount((prev) => prev + 1); // 强制触发重新渲染
     }, 1000);
 
-    return () => clearInterval(timer);
-  }, []);
+    return () => {
+      console.log('[UserTimezoneDisplay] 组件卸载，清理定时器');
+      clearInterval(timer);
+    };
+  }, [timezone]); // 添加timezone依赖，当timezone变化时重新创建定时器
 
   // 格式化时间显示（使用用户时区）
-  const formatDateTime = () => {
+  const { date, time } = useMemo(() => {
+    console.log('[UserTimezoneDisplay] 重新计算时间格式, currentTime:', currentTime.toLocaleTimeString(), 'timezone:', timezone, 'tickCount:', tickCount);
     try {
       // 如果提供了时区，使用指定时区；否则使用浏览器本地时区
       const options: Intl.DateTimeFormatOptions = {
@@ -68,10 +80,10 @@ export const UserTimezoneDisplay = ({
         time: `${hours}:${minutes}:${seconds}`,
       };
     }
-  };
+  }, [currentTime, timezone, tickCount]); // 依赖currentTime、timezone和tickCount
 
-  // 获取时区显示名称
-  const getTimezoneDisplay = () => {
+  // 获取时区显示名称 - 使用useMemo缓存
+  const timezoneDisplay = useMemo(() => {
     if (!timezone) {
       return null;
     }
@@ -90,10 +102,7 @@ export const UserTimezoneDisplay = ({
     } catch (error) {
       return timezone;
     }
-  };
-
-  const { date, time } = formatDateTime();
-  const timezoneDisplay = getTimezoneDisplay();
+  }, [currentTime, timezone]); // 依赖currentTime和timezone
 
   return (
     <div className="flex items-center gap-2 px-3 py-2 text-xs text-gray-500">

@@ -48,17 +48,78 @@ const ChatFooter: ForwardRefRenderFunction<unknown, unknown> = (_, ref) => {
     }
 
     const fetchOtherUserInfo = async () => {
+      // 用户ID到时区的映射表
+      const userTimezoneMap: Record<string, string> = {
+        '1558891557': 'America/Los_Angeles',  // TT - 洛杉矶时间
+        '4132941641': 'Asia/Shanghai',        // 其他用户 - 上海时间
+        // 可以继续添加其他用户的时区映射
+      };
+
       try {
-        const { data } = await getBusinessUserInfo([currentConversation.userID]);
-        if (data.users && data.users.length > 0) {
-          setOtherUserInfo(data.users[0]);
+        const response = await getBusinessUserInfo([currentConversation.userID]);
+        console.log('[时区调试] API完整响应:', response);
+        console.log('[时区调试] API返回的data字段:', response.data);
+
+        if (response.data.users && response.data.users.length > 0) {
+          let userInfo = response.data.users[0];
+          console.log('[时区调试] 获取到的用户信息完整对象:', userInfo);
+          console.log('[时区调试] 用户信息的所有字段:', Object.keys(userInfo));
+          console.log('[时区调试] timezone字段的值:', userInfo.timezone);
+          console.log('[时区调试] timezone字段类型:', typeof userInfo.timezone);
+
+          // 如果后端没有返回timezone,使用本地配置的时区映射
+          if (!userInfo.timezone) {
+            // 查找用户的时区配置
+            const mappedTimezone = userTimezoneMap[userInfo.userID];
+
+            if (mappedTimezone) {
+              userInfo = {
+                ...userInfo,
+                timezone: mappedTimezone
+              };
+              console.log(`[时区映射] 用户 ${userInfo.userID} 使用配置的时区:`, mappedTimezone);
+            } else {
+              // 如果没有配置,使用默认时区(上海时间)
+              userInfo = {
+                ...userInfo,
+                timezone: 'Asia/Shanghai'
+              };
+              console.log(`[时区映射] 用户 ${userInfo.userID} 使用默认时区: Asia/Shanghai`);
+            }
+          }
+
+          setOtherUserInfo(userInfo);
         }
       } catch (error) {
         console.error("获取对方用户信息失败:", error);
+
+        // API失败时,使用本地时区映射创建一个基本的用户信息对象
+        const mappedTimezone = userTimezoneMap[currentConversation.userID] || 'Asia/Shanghai';
+        const fallbackUserInfo = {
+          userID: currentConversation.userID,
+          nickname: currentConversation.showName || '',
+          timezone: mappedTimezone,
+          faceURL: currentConversation.faceURL || '',
+        };
+
+        console.log('[时区映射-降级] API失败，使用本地配置创建用户信息:', fallbackUserInfo);
+        setOtherUserInfo(fallbackUserInfo);
       }
     };
 
+    // 立即获取一次用户信息
     fetchOtherUserInfo();
+
+    // 每30秒刷新一次用户信息，以便及时获取时区更新
+    const refreshInterval = setInterval(() => {
+      console.log('[时区刷新] 定期刷新用户信息');
+      fetchOtherUserInfo();
+    }, 30000); // 30秒
+
+    // 清理定时器
+    return () => {
+      clearInterval(refreshInterval);
+    };
   }, [isGroupSession, currentConversation?.userID]);
 
   // 获取群成员列表
