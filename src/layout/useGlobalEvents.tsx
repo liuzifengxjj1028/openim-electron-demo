@@ -9,6 +9,7 @@ import {
   GroupItem,
   GroupMemberItem,
   MessageItem,
+  ReceiptInfo,
   RevokedInfo,
   SelfUserInfo,
   WSEvent,
@@ -177,6 +178,7 @@ export function useGlobalEvent() {
     // message
     IMSDK.on(CbEvents.OnRecvNewMessages, newMessageHandler);
     IMSDK.on(CbEvents.OnNewRecvMessageRevoked, revokedMessageHandler);
+    IMSDK.on(CbEvents.OnRecvC2CReadReceipt, c2cReadReceiptHandler);
     // conversation
     IMSDK.on(CbEvents.OnConversationChanged, conversationChnageHandler);
     IMSDK.on(CbEvents.OnNewConversation, newConversationHandler);
@@ -272,6 +274,19 @@ export function useGlobalEvent() {
         detail: JSON.stringify(data),
       },
     } as MessageItem);
+  };
+
+  const c2cReadReceiptHandler = ({ data }: WSEvent<ReceiptInfo[]>) => {
+    console.log('[已读回执] 收到已读回执:', data);
+    data.forEach((receipt) => {
+      receipt.msgIDList.forEach((clientMsgID) => {
+        console.log('[已读回执] 更新消息已读状态:', clientMsgID);
+        updateOneMessage({
+          clientMsgID,
+          isRead: true,
+        } as MessageItem);
+      });
+    });
   };
 
   const notPushType = [MessageType.TypingMessage, MessageType.RevokeMessage];
@@ -443,6 +458,7 @@ export function useGlobalEvent() {
     IMSDK.off(CbEvents.OnSyncServerFailed, syncFailedHandler);
     // message
     IMSDK.off(CbEvents.OnRecvNewMessages, newMessageHandler);
+    IMSDK.off(CbEvents.OnRecvC2CReadReceipt, c2cReadReceiptHandler);
     // conversation
     IMSDK.off(CbEvents.OnConversationChanged, conversationChnageHandler);
     IMSDK.off(CbEvents.OnNewConversation, newConversationHandler);
