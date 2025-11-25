@@ -23,6 +23,7 @@ export const useConversationStore = create<ConversationStore>()((set, get) => ({
   currentGroupInfo: undefined,
   currentMemberInGroup: undefined,
   initialUnreadCount: 0,
+  conversationEntryTime: 0, // 追踪每次进入会话的时间
   getConversationListByReq: async (isOffset?: boolean) => {
     let tmpConversationList = [] as ConversationItem[];
     try {
@@ -47,10 +48,14 @@ export const useConversationStore = create<ConversationStore>()((set, get) => ({
     list: ConversationItem[],
     type: ConversationListUpdateType,
   ) => {
+    // 如果更新的会话是当前会话，只更新会话数据，不更新 conversationEntryTime 和 initialUnreadCount
     const idx = list.findIndex(
       (c) => c.conversationID === get().currentConversation?.conversationID,
     );
-    if (idx > -1) get().updateCurrentConversation(list[idx]);
+    if (idx > -1) {
+      // 只更新 currentConversation，不触发完整的 updateCurrentConversation
+      set(() => ({ currentConversation: { ...list[idx] } }));
+    }
 
     if (type === "filter") {
       set((state) => ({
@@ -88,11 +93,14 @@ export const useConversationStore = create<ConversationStore>()((set, get) => ({
     const toggleNewConversation =
       conversation.conversationID !== prevConversation?.conversationID;
 
-    // 在会话切换时，立即保存未读数（在SDK标记已读之前）
-    if (toggleNewConversation) {
-      console.log("切换会话，保存初始未读数:", conversation.unreadCount);
-      set(() => ({ initialUnreadCount: conversation.unreadCount }));
-    }
+    // 每次进入会话时都保存未读数和进入时间
+    // 这样即使重新进入相同会话，也能触发重新处理
+    const entryTime = Date.now();
+    console.log("进入会话，保存初始未读数:", conversation.unreadCount, "进入时间:", entryTime);
+    set(() => ({
+      initialUnreadCount: conversation.unreadCount,
+      conversationEntryTime: entryTime,
+    }));
 
     if (toggleNewConversation && isGroupSession(conversation.conversationType)) {
       get().getCurrentGroupInfoByReq(conversation.groupID);
@@ -164,6 +172,7 @@ export const useConversationStore = create<ConversationStore>()((set, get) => ({
       currentMemberInGroup: undefined,
       quoteMessage: undefined,
       initialUnreadCount: 0,
+      conversationEntryTime: 0,
     }));
   },
 }));

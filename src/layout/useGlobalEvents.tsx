@@ -29,6 +29,7 @@ import { useContactStore } from "@/store/contact";
 import { feedbackToast } from "@/utils/common";
 import { initStore } from "@/utils/imCommon";
 import { clearIMProfile, getIMToken, getIMUserID } from "@/utils/storage";
+import { notificationManager } from "@/utils/notification";
 
 import { IMSDK } from "./MainContentWrap";
 
@@ -103,8 +104,43 @@ export function useGlobalEvent() {
     window.addEventListener("offline", () => {
       IMSDK.networkStatusChanged();
     });
+
+    // Register notification permission change handler
+    notificationManager.onPermissionChange(async (permission) => {
+      if (permission === "denied") {
+        const isElectron = notificationManager.isElectronEnvironment();
+
+        if (isElectron) {
+          // Electron environment: Test system notification
+          const systemWorking = await notificationManager.testSystemNotification();
+
+          if (!systemWorking) {
+            feedbackToast({
+              msg: "系统通知已被关闭",
+              error: "您的 macOS 系统设置中关闭了通知权限。\n\n请在控制台运行以下命令打开系统设置：\nwindow.electronAPI.openNotificationSettings()\n\n或手动前往：系统设置 → 通知 → OpenIM → 开启通知",
+              duration: 15000,
+            });
+          } else {
+            feedbackToast({
+              msg: "浏览器通知权限已被关闭",
+              error: "请点击地址栏左侧图标，选择「网站设置」→「通知」→「允许」",
+              duration: 10000,
+            });
+          }
+        } else {
+          // Web browser environment
+          feedbackToast({
+            msg: "通知权限已被关闭",
+            error: "您已关闭消息通知权限。如需重新启用：\n\n1. 点击地址栏左侧的锁图标\n2. 选择「网站设置」\n3. 找到「通知」\n4. 改为「允许」",
+            duration: 10000,
+          });
+        }
+      }
+    });
+
     return () => {
       disposeIMListener();
+      notificationManager.stopPermissionMonitoring();
     };
   }, []);
 
@@ -152,6 +188,34 @@ export function useGlobalEvent() {
         });
       }
       initStore();
+      // Request notification permission after successful login
+      setTimeout(async () => {
+        const granted = await notificationManager.requestPermission();
+
+        // If permission is denied, show a helpful message
+        if (!granted && notificationManager.getSettings().permission === "denied") {
+          const isElectron = notificationManager.isElectronEnvironment();
+
+          if (isElectron) {
+            // Test if system notifications work
+            const systemWorking = await notificationManager.testSystemNotification();
+
+            if (!systemWorking) {
+              feedbackToast({
+                msg: "系统通知权限被阻止",
+                error: "macOS 系统设置中关闭了通知权限。\n\n快捷方式：在控制台运行\nwindow.electronAPI.openNotificationSettings()\n\n手动设置：系统设置 → 通知 → OpenIM → 开启通知",
+                duration: 15000,
+              });
+            }
+          } else {
+            feedbackToast({
+              msg: "通知权限已被阻止",
+              error: "无法接收消息通知。请按以下步骤启用：\n\n1. 点击地址栏左侧的锁图标\n2. 选择「网站设置」\n3. 找到「通知」\n4. 改为「允许」",
+              duration: 10000,
+            });
+          }
+        }
+      }, 1000);
     } catch (error) {
       console.error(error);
       if ((error as WsResponse).errCode !== 10102) {
@@ -263,7 +327,11 @@ export function useGlobalEvent() {
     if (useUserStore.getState().syncState === "loading" || resume.current) {
       return;
     }
-    data.map((message) => handleNewMessage(message));
+    data.map((message) => {
+      handleNewMessage(message);
+      // Show notification for messages NOT in current conversation
+      handleMessageNotification(message);
+    });
   };
 
   const revokedMessageHandler = ({ data }: WSEvent<RevokedInfo>) => {
@@ -332,6 +400,58 @@ export function useGlobalEvent() {
         );
       default:
         return false;
+    }
+  };
+
+  const handleMessageNotification = async (message: MessageItem) => {
+    console.log("[useGlobalEvents] handleMessageNotification called", {
+      sendID: message.sendID,
+      sessionType: message.sessionType,
+      contentType: message.contentType,
+    });
+
+    // Don't notify if message is in current conversation (already visible)
+    if (inCurrentConversation(message)) {
+      console.log("[useGlobalEvents] Message in current conversation, skipping notification");
+      return;
+    }
+
+    // Don't notify for own messages
+    const selfUserID = useUserStore.getState().selfInfo.userID;
+    if (message.sendID === selfUserID) {
+      console.log("[useGlobalEvents] Own message, skipping notification");
+      return;
+    }
+
+    try {
+      // Get conversation ID
+      const conversationID = message.sessionType === SessionType.Single
+        ? `si_${message.sendID}_${selfUserID}`
+        : `sg_${message.groupID}`;
+
+      // Get conversation info to get the name
+      const { data: conversationInfo } = await IMSDK.getOneConversation({
+        sourceID: message.sessionType === SessionType.Single ? message.sendID : message.groupID,
+        sessionType: message.sessionType,
+      });
+
+      const conversationName = conversationInfo.showName || "New Message";
+      console.log("[useGlobalEvents] Calling notificationManager.showMessageNotification", {
+        conversationName,
+        conversationID,
+      });
+
+      // Show notification with click handler
+      await notificationManager.showMessageNotification(
+        message,
+        conversationName,
+        () => {
+          // Navigate to conversation when notification is clicked
+          navigate(`/chat?conversationID=${conversationID}`);
+        }
+      );
+    } catch (error) {
+      console.error("[useGlobalEvents] Failed to show message notification:", error);
     }
   };
 

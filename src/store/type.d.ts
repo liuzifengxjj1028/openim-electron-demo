@@ -50,6 +50,7 @@ export interface ConversationStore {
   currentGroupInfo?: GroupItem;
   currentMemberInGroup?: GroupMemberItem;
   initialUnreadCount: number; // 保存切换会话时的初始未读数
+  conversationEntryTime: number; // 追踪每次进入会话的时间戳
   getConversationListByReq: (
     isOffset?: boolean
   ) => Promise<boolean>;

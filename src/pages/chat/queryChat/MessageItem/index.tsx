@@ -1,6 +1,6 @@
 import { MessageItem as MessageItemType, MessageType, SessionType } from "@openim/wasm-client-sdk";
 import clsx from "clsx";
-import { FC, memo, useCallback, useRef, useState } from "react";
+import { FC, memo, useCallback, useEffect, useRef, useState } from "react";
 
 import OIMAvatar from "@/components/OIMAvatar";
 import { formatMessageTime } from "@/utils/imCommon";
@@ -19,6 +19,7 @@ export interface IMessageItemProps {
   conversationID?: string;
   messageUpdateFlag?: string;
   isHighlight?: boolean;
+  isFirstUnread?: boolean;
 }
 
 const components: Record<number, FC<IMessageItemProps>> = {
@@ -33,10 +34,28 @@ const MessageItem: FC<IMessageItemProps> = ({
   isSender,
   conversationID,
   isHighlight = false,
+  isFirstUnread = false,
 }) => {
   const messageWrapRef = useRef<HTMLDivElement>(null);
   const [showMessageMenu, setShowMessageMenu] = useState(false);
+  const [showUnreadIndicator, setShowUnreadIndicator] = useState(true);
   const MessageRenderComponent = components[message.contentType] || CatchMessageRender;
+
+  // 当 isFirstUnread 变化时，重置或启动定时器
+  useEffect(() => {
+    if (isFirstUnread) {
+      // 重置为可见状态
+      setShowUnreadIndicator(true);
+      // 10秒后隐藏
+      const timer = setTimeout(() => {
+        setShowUnreadIndicator(false);
+      }, 10000);
+      return () => clearTimeout(timer);
+    } else {
+      // 当不再是第一条未读消息时，重置状态以备下次使用
+      setShowUnreadIndicator(true);
+    }
+  }, [isFirstUnread]);
 
   const closeMessageMenu = useCallback(() => {
     setShowMessageMenu(false);
@@ -49,6 +68,19 @@ const MessageItem: FC<IMessageItemProps> = ({
 
   return (
     <>
+      {/* 最早未读消息提示 - 蓝色，10秒后淡出，不影响布局 */}
+      {isFirstUnread && (
+        <div
+          className="flex w-full items-center justify-center py-2 transition-opacity duration-500"
+          style={{ opacity: showUnreadIndicator ? 1 : 0 }}
+        >
+          <div className="flex items-center">
+            <div className="h-px w-16 bg-blue-400"></div>
+            <span className="mx-3 text-xs font-medium text-blue-500">最早未读消息</span>
+            <div className="h-px w-16 bg-blue-400"></div>
+          </div>
+        </div>
+      )}
       <div
         id={`chat_${message.clientMsgID}`}
         className={clsx(
