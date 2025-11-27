@@ -6,6 +6,7 @@ import OIMAvatar from "@/components/OIMAvatar";
 import { formatMessageTime } from "@/utils/imCommon";
 
 import CatchMessageRender from "./CatchMsgRenderer";
+import GroupReadStatus from "./GroupReadStatus";
 import MediaMessageRender from "./MediaMessageRender";
 import styles from "./message-item.module.scss";
 import MessageItemErrorBoundary from "./MessageItemErrorBoundary";
@@ -63,8 +64,11 @@ const MessageItem: FC<IMessageItemProps> = ({
 
   const canShowMessageMenu = !disabled;
 
-  // 检查是否显示已读标记：只在单聊中显示，且是自己发送的消息，且消息已被阅读
-  const showReadIndicator = isSender && message.sessionType === SessionType.Single && message.isRead;
+  // 检查是否显示单聊已读标记：只在单聊中显示，且是自己发送的消息，且消息已被阅读
+  const showSingleReadIndicator = isSender && message.sessionType === SessionType.Single && message.isRead;
+
+  // 检查是否显示群聊已读状态：群聊中自己发送的消息
+  const showGroupReadStatus = isSender && message.sessionType === SessionType.Group;
 
   return (
     <>
@@ -140,10 +144,15 @@ const MessageItem: FC<IMessageItemProps> = ({
               />
 
               {/* 单聊已读标记 - 使用与MessageSuffix相同的样式，距离气泡3px */}
-              {showReadIndicator && (
+              {showSingleReadIndicator && (
                 <div className={`${styles.suffix} !mr-[3px]`}>
                   <span className="text-base text-green-500">✅</span>
                 </div>
+              )}
+
+              {/* 群聊已读状态 */}
+              {showGroupReadStatus && (
+                <GroupReadStatus message={message} />
               )}
             </div>
           </div>
@@ -153,4 +162,54 @@ const MessageItem: FC<IMessageItemProps> = ({
   );
 };
 
-export default memo(MessageItem);
+// 自定义比较函数，确保 groupHasReadInfo 变化时重新渲染
+const areEqual = (prevProps: IMessageItemProps, nextProps: IMessageItemProps) => {
+  // 如果消息ID不同，重新渲染
+  if (prevProps.message.clientMsgID !== nextProps.message.clientMsgID) {
+    console.log("[MessageItem areEqual] clientMsgID changed, re-render");
+    return false;
+  }
+
+  // 检查顶层的 _groupReadCount（用于触发 React 变化检测）
+  const prevGroupReadCount = (prevProps.message as any)._groupReadCount;
+  const nextGroupReadCount = (nextProps.message as any)._groupReadCount;
+  if (prevGroupReadCount !== nextGroupReadCount) {
+    console.log("[MessageItem areEqual] _groupReadCount changed:", {
+      clientMsgID: nextProps.message.clientMsgID?.slice(-8),
+      prevGroupReadCount,
+      nextGroupReadCount,
+    });
+    return false;
+  }
+
+  // 检查嵌套的 groupHasReadInfo 是否变化（兜底）
+  const prevReadCount = prevProps.message.attachedInfoElem?.groupHasReadInfo?.hasReadCount;
+  const nextReadCount = nextProps.message.attachedInfoElem?.groupHasReadInfo?.hasReadCount;
+  if (prevReadCount !== nextReadCount) {
+    console.log("[MessageItem areEqual] hasReadCount changed:", {
+      clientMsgID: nextProps.message.clientMsgID?.slice(-8),
+      prevReadCount,
+      nextReadCount,
+    });
+    return false;
+  }
+
+  // 检查其他常见变化
+  if (prevProps.message.status !== nextProps.message.status) {
+    return false;
+  }
+  if (prevProps.message.isRead !== nextProps.message.isRead) {
+    return false;
+  }
+  if (prevProps.isSender !== nextProps.isSender) {
+    return false;
+  }
+  if (prevProps.isHighlight !== nextProps.isHighlight) {
+    return false;
+  }
+
+  return true;
+};
+
+// 使用 memo 和自定义 areEqual 函数，包含 _groupReadCount 检测
+export default memo(MessageItem, areEqual);

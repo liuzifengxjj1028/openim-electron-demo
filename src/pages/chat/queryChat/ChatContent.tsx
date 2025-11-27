@@ -1,4 +1,4 @@
-import { MessageItem as MessageItemType, SessionType } from "@openim/wasm-client-sdk";
+import { MessageItem as MessageItemType, SessionType, ViewType } from "@openim/wasm-client-sdk";
 import { Layout, Spin } from "antd";
 import axios from "axios";
 import clsx from "clsx";
@@ -8,7 +8,7 @@ import { v4 as uuidv4 } from "uuid";
 
 import { SystemMessageTypes } from "@/constants/im";
 import { IMSDK } from "@/layout/MainContentWrap";
-import { useConversationStore, useUserStore } from "@/store";
+import { useConversationStore, useUserStore, useGroupReadStatusStore } from "@/store";
 import emitter from "@/utils/events";
 import { getIMToken } from "@/utils/storage";
 
@@ -43,7 +43,6 @@ const markMsgsAsReadBySeqs = async (
       }
     );
 
-    console.log("服务端标记已读成功:", response.data);
     return response.data;
   } catch (error) {
     console.error("服务端标记已读失败:", error);
@@ -64,6 +63,8 @@ const ChatContent = () => {
     endIndex: 0,
   });
   const [unreadBelowCount, setUnreadBelowCount] = useState(0);
+  // 强制 Virtuoso 重新渲染的计数器
+  const [dataVersion, setDataVersion] = useState(0);
   // 跟踪用户已经查看到的最大未读消息索引
   const maxViewedUnreadIndexRef = useRef<number>(-1);
   // 跟踪是否已经滚动到底部
@@ -84,6 +85,8 @@ const ChatContent = () => {
   const markedMsgIDsRef = useRef<Set<string>>(new Set());
   // 跟踪上一次的 conversationEntryTime，用于检测重新进入相同会话
   const prevEntryTimeRef = useRef<number>(0);
+  // 跟踪消息列表是否已加载（用于群聊已读轮询）
+  const hasMessagesLoadedRef = useRef<boolean>(false);
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -95,23 +98,15 @@ const ChatContent = () => {
     });
   };
 
-  const { SPLIT_COUNT, conversationID, loadState, moreOldLoading, getMoreOldMessages } =
+  const { SPLIT_COUNT, conversationID, loadState, latestLoadState, moreOldLoading, getMoreOldMessages, updateMessageReadStatus } =
     useHistoryMessageList(initialUnreadCount);
+
 
   // 检测会话切换或重新进入相同会话，重置滚动状态
   const isNewConversation = conversationID !== prevConversationIDRef.current;
   const isReentryToSameConversation = !isNewConversation && conversationEntryTime !== prevEntryTimeRef.current && prevEntryTimeRef.current !== 0;
 
   if (isNewConversation || isReentryToSameConversation) {
-    console.log("检测到会话切换或重新进入:", {
-      isNewConversation,
-      isReentryToSameConversation,
-      from: prevConversationIDRef.current,
-      to: conversationID,
-      prevEntryTime: prevEntryTimeRef.current,
-      newEntryTime: conversationEntryTime,
-    });
-
     prevConversationIDRef.current = conversationID;
     prevEntryTimeRef.current = conversationEntryTime;
     maxViewedUnreadIndexRef.current = -1;
@@ -120,6 +115,7 @@ const ChatContent = () => {
     prevInitLoadingRef.current = true;
     hasMarkedAsReadRef.current = false; // 重置已读标记
     markedMsgIDsRef.current = new Set(); // 重置已标记消息集合
+    hasMessagesLoadedRef.current = false; // 重置消息加载标记
   }
 
   // 首次渲染时记录 entryTime
@@ -130,10 +126,9 @@ const ChatContent = () => {
   // 会话切换时禁用 followOutput 并重置状态
   useEffect(() => {
     setEnableFollowOutput(false);
-    setFirstUnreadMsgID(""); // 重置第一条未读消息ID
-    setHighlightMsgID(""); // 重置高亮消息ID
-    hasScrolledToUnreadRef.current = false; // 重置滚动标记，允许重新处理未读消息
-    console.log("会话切换/重新进入，重置状态, conversationEntryTime:", conversationEntryTime);
+    setFirstUnreadMsgID("");
+    setHighlightMsgID("");
+    hasScrolledToUnreadRef.current = false;
   }, [conversationID, conversationEntryTime]);
 
   // 计算当前屏幕下方的未读消息数
@@ -141,19 +136,10 @@ const ChatContent = () => {
     if (loadState.initLoading || !currentConversation) return;
 
     const messageList = loadState.messageList;
-    const unreadCount = initialUnreadCount; // 使用从 store 中获取的初始未读数
+    const unreadCount = initialUnreadCount;
 
-    // 将 Virtuoso 的虚拟索引转换为实际数组索引
     const actualStartIndex = visibleRange.startIndex - loadState.firstItemIndex;
     const actualEndIndex = visibleRange.endIndex - loadState.firstItemIndex;
-
-    console.log("计算未读消息:", {
-      unreadCount,
-      messageListLength: messageList.length,
-      virtuosoRange: visibleRange,
-      firstItemIndex: loadState.firstItemIndex,
-      actualRange: { start: actualStartIndex, end: actualEndIndex },
-    });
 
     if (unreadCount === 0) {
       setUnreadBelowCount(0);
@@ -166,11 +152,9 @@ const ChatContent = () => {
 
     // 更新用户已查看到的最大未读消息索引
     if (actualEndIndex >= firstUnreadIndex) {
-      // 用户的可视区域包含了一些未读消息
       const viewedUnreadIndex = Math.min(actualEndIndex, lastUnreadIndex);
       if (viewedUnreadIndex > maxViewedUnreadIndexRef.current) {
         maxViewedUnreadIndexRef.current = viewedUnreadIndex;
-        console.log("更新已查看索引:", viewedUnreadIndex);
       }
     }
 
@@ -180,14 +164,6 @@ const ChatContent = () => {
     for (let i = Math.max(startCountFrom, actualEndIndex + 1); i <= lastUnreadIndex; i++) {
       countBelowScreen++;
     }
-
-    console.log("未读消息统计:", {
-      firstUnreadIndex,
-      lastUnreadIndex,
-      maxViewedIndex: maxViewedUnreadIndexRef.current,
-      actualEndIndex,
-      countBelowScreen,
-    });
 
     setUnreadBelowCount(countBelowScreen);
   }, [visibleRange, loadState.messageList, loadState.initLoading, loadState.firstItemIndex, initialUnreadCount]);
@@ -214,72 +190,33 @@ const ChatContent = () => {
 
   // 使用 useLayoutEffect 在 DOM 渲染后立即滚动到未读消息
   useLayoutEffect(() => {
-    console.log("滚动 useLayoutEffect 触发:", {
-      initLoading: loadState.initLoading,
-      hasScrolled: hasScrolledToUnreadRef.current,
-      messageCount: loadState.messageList.length,
-      conversationID,
-      initialUnreadCount,
-    });
-
-    // 还在加载中，跳过
-    if (loadState.initLoading) {
-      console.log("跳过: 还在加载中");
-      return;
-    }
-
-    // 如果已经滚动过，跳过
-    if (hasScrolledToUnreadRef.current) {
-      console.log("跳过: 已经滚动过");
-      return;
-    }
+    if (loadState.initLoading) return;
+    if (hasScrolledToUnreadRef.current) return;
 
     const messageList = loadState.messageList;
-
-    // 消息列表为空，跳过
-    if (messageList.length === 0) {
-      console.log("跳过: 消息列表为空");
-      return;
-    }
+    if (messageList.length === 0) return;
 
     const unreadCount = initialUnreadCount;
-    console.log("准备处理未读消息, initialUnreadCount=", initialUnreadCount);
-
     savedUnreadCountRef.current = unreadCount;
 
     if (unreadCount === 0) {
-      // 无未读，启用 followOutput 后会自动滚动到底部
-      console.log("无未读消息，启用 followOutput");
-      hasScrolledToUnreadRef.current = true; // 只有在确定无未读时才标记
+      hasScrolledToUnreadRef.current = true;
       setEnableFollowOutput(true);
       return;
     }
 
-    // 有未读消息，标记为已滚动（在处理之前标记，防止重复处理）
     hasScrolledToUnreadRef.current = true;
-    console.log("标记为已滚动，开始处理未读消息");
 
-    // 计算第一条未读消息的索引
     const firstUnreadIndex = Math.max(0, messageList.length - unreadCount);
     const firstUnreadMsg = messageList[firstUnreadIndex];
 
-    console.log("计算第一条未读消息:", {
-      firstUnreadIndex,
-      firstUnreadMsgID: firstUnreadMsg?.clientMsgID,
-      messageListLength: messageList.length,
-    });
-
     if (firstUnreadMsg) {
-      // 设置第一条未读消息ID
-      console.log("设置 firstUnreadMsgID:", firstUnreadMsg.clientMsgID);
       setFirstUnreadMsgID(firstUnreadMsg.clientMsgID);
 
-      // 使用 requestAnimationFrame 确保 DOM 已更新
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           if (virtuoso.current) {
             const virtuosoIndex = firstUnreadIndex + loadState.firstItemIndex;
-            console.log("执行滚动到:", virtuosoIndex);
             virtuoso.current.scrollToIndex({
               index: virtuosoIndex,
               align: "start",
@@ -294,9 +231,7 @@ const ChatContent = () => {
             setHighlightMsgID("");
           }, 1000);
 
-          // 10秒后清除提示
           setTimeout(() => {
-            console.log("10秒后清除 firstUnreadMsgID");
             setFirstUnreadMsgID("");
           }, 10000);
         });
@@ -312,6 +247,206 @@ const ChatContent = () => {
       emitter.off("CHAT_LIST_SCROLL_TO_BOTTOM", scrollToBottom);
     };
   }, []);
+
+  // 保存 updateMessageReadStatus 的 ref，避免依赖变化导致 useEffect 重复执行
+  const updateMessageReadStatusRef = useRef(updateMessageReadStatus);
+  updateMessageReadStatusRef.current = updateMessageReadStatus;
+
+  // 群聊已读状态定时刷新（轮询方案）
+  // 通过 HTTP API pull_msg_by_seq 获取最新的 groupHasReadInfo
+  useEffect(() => {
+    // 只在群聊中启用 - 检查 conversationType (SessionType.Group = 3)
+    const isGroupChat = currentConversation?.conversationType === SessionType.Group;
+    if (!currentConversation || !isGroupChat) {
+      return;
+    }
+
+    // 还在加载中或没有 conversationID，跳过
+    if (loadState.initLoading || !conversationID) {
+      return;
+    }
+
+    // 等消息列表首次加载完成后再启动轮询
+    // 使用 ref 跟踪，避免依赖 messageList.length 导致轮询频繁重启
+    if (loadState.messageList.length > 0) {
+      hasMessagesLoadedRef.current = true;
+    }
+
+    if (!hasMessagesLoadedRef.current) {
+      console.log("[群聊已读刷新] 消息列表尚未加载，等待...");
+      return;
+    }
+
+    console.log("[群聊已读刷新] 初始化轮询, conversationID:", conversationID);
+
+    let isActive = true; // 用于清理时取消pending请求
+
+    const refreshGroupReadStatus = async () => {
+      if (!isActive) return;
+
+      console.log("[群聊已读刷新] ⏰ 执行轮询 (HTTP API)...");
+
+      try {
+        // 获取自己发送的消息（使用 ref 获取最新的消息列表）
+        const localMsgList = latestLoadState.current?.messageList || [];
+        const myMsgs = localMsgList.filter((msg) => msg.sendID === selfUserID);
+
+        console.log("[群聊已读刷新] 消息列表长度:", localMsgList.length, "自己的消息数:", myMsgs.length);
+
+        if (myMsgs.length === 0) {
+          console.log("[群聊已读刷新] 没有自己发送的消息，跳过");
+          return;
+        }
+
+        // 获取最近的 20 条自己的消息的 seq 用于查询
+        // 使用 slice(-20) 获取最后 20 条（最新的），而不是 slice(0, 20)（最旧的）
+        const recentMyMsgs = myMsgs.slice(-20);
+        const seqs = recentMyMsgs.map((msg) => msg.seq).filter((seq) => seq > 0);
+
+        if (seqs.length === 0) {
+          console.log("[群聊已读刷新] 没有有效的 seq，跳过");
+          return;
+        }
+
+        // 检查是否有新发送的消息（seq=0 的消息）
+        // 新消息可能还没有分配 seq，需要扩展查询范围
+        const hasNewMessages = recentMyMsgs.some((msg) => msg.seq === 0);
+        const minSeq = Math.min(...seqs);
+        const maxSeq = Math.max(...seqs);
+        // 如果有新消息，扩展查询范围 +50，以便捕获刚发送的消息
+        // +50 是为了覆盖群内其他用户可能发送的消息导致的 seq 跳跃
+        const endSeq = hasNewMessages ? maxSeq + 50 : maxSeq;
+
+        console.log("[群聊已读刷新] seq范围:", minSeq, "-", endSeq, "hasNewMessages:", hasNewMessages, "最新消息seqs:", seqs.slice(-5));
+
+        // 获取 token（使用正确的 localForage 存储）
+        const token = await getIMToken() as string;
+        if (!token) {
+          console.warn("[群聊已读刷新] 未找到 token，跳过");
+          return;
+        }
+
+        // 构建请求参数
+        // num 应该是范围内可能的消息数量
+        const seqRanges = [{
+          conversationID: conversationID!,
+          begin: minSeq,
+          end: endSeq,
+          num: endSeq - minSeq + 1,
+        }];
+
+        // 调用 HTTP API 获取最新消息数据
+        const response = await fetch("http://localhost:10002/msg/pull_msg_by_seq", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "operationID": `poll-${Date.now()}`,
+            "token": token,
+          },
+          body: JSON.stringify({
+            userID: selfUserID,
+            seqRanges: seqRanges,
+          }),
+        });
+
+        if (!isActive) return;
+
+        const result = await response.json();
+        console.log("[群聊已读刷新] API 响应:", JSON.stringify(result).slice(0, 500));
+
+        if (result.errCode !== 0) {
+          console.warn("[群聊已读刷新] API 错误:", result.errMsg);
+          return;
+        }
+
+        // 解析返回的消息
+        const serverMsgs = result.data?.msgs?.[conversationID!]?.Msgs || [];
+        console.log("[群聊已读刷新] 服务器返回消息数:", serverMsgs.length);
+
+        let updateCount = 0;
+
+        for (const serverMsg of serverMsgs) {
+          if (!isActive) break;
+
+          // 解析 attachedInfo
+          let groupHasReadInfo = null;
+          if (serverMsg.attachedInfo) {
+            try {
+              const attachedInfo = JSON.parse(serverMsg.attachedInfo);
+              groupHasReadInfo = attachedInfo.groupHasReadInfo;
+            } catch {
+              // ignore
+            }
+          }
+
+          if (!groupHasReadInfo) continue;
+
+          const freshReadCount = groupHasReadInfo.hasReadCount || 0;
+
+          // 检查是否需要更新
+          const storeReadInfo = useGroupReadStatusStore.getState().readStatusMap[serverMsg.clientMsgID];
+          const localMsg = localMsgList.find((m) => m.clientMsgID === serverMsg.clientMsgID);
+          const localReadCount = localMsg?.attachedInfoElem?.groupHasReadInfo?.hasReadCount || 0;
+          const storeReadCount = storeReadInfo?.hasReadCount ?? localReadCount;
+
+          console.log("[群聊已读刷新] 检查消息:", {
+            clientMsgID: serverMsg.clientMsgID?.slice(-8),
+            seq: serverMsg.seq,
+            freshReadCount,
+            storeReadCount,
+            needUpdate: freshReadCount !== storeReadCount,
+          });
+
+          if (freshReadCount !== storeReadCount) {
+            console.log("[群聊已读刷新] 🔄 更新:", serverMsg.clientMsgID?.slice(-8), storeReadCount, "->", freshReadCount);
+
+            // 直接更新 store（这会触发 GroupReadStatus 重新渲染）
+            useGroupReadStatusStore.getState().updateReadStatus(serverMsg.clientMsgID, {
+              hasReadCount: freshReadCount,
+              groupMemberCount: groupHasReadInfo.groupMemberCount || 4,
+              hasReadUserIDList: groupHasReadInfo.hasReadUserIDList || [],
+            });
+
+            // 同时更新 loadState（保持数据一致性）- 使用 ref 调用
+            updateMessageReadStatusRef.current(serverMsg.clientMsgID, {
+              hasReadCount: freshReadCount,
+              hasReadUserIDList: groupHasReadInfo.hasReadUserIDList || [],
+              groupMemberCount: groupHasReadInfo.groupMemberCount || 4,
+            }, serverMsg.seq);
+            updateCount++;
+          }
+        }
+
+        if (updateCount > 0) {
+          console.log("[群聊已读刷新] ✅ 更新了", updateCount, "条消息");
+        }
+      } catch (error: any) {
+        if (isActive) {
+          console.error("[群聊已读刷新] 失败:", error?.message);
+        }
+      }
+    };
+
+    // 延迟 500ms 再开始第一次轮询，确保消息列表完全加载
+    const initialTimeoutId = setTimeout(() => {
+      if (isActive) {
+        refreshGroupReadStatus();
+      }
+    }, 500);
+
+    // 每 3 秒刷新一次
+    const intervalId = setInterval(refreshGroupReadStatus, 3000);
+
+    return () => {
+      console.log("[群聊已读刷新] 清理轮询");
+      isActive = false;
+      clearTimeout(initialTimeoutId);
+      clearInterval(intervalId);
+    };
+  // 移除 loadState.messageList.length > 0 依赖，使用 hasMessagesLoadedRef 追踪状态
+  // 这样可以避免消息列表变化时轮询被频繁重启
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationID, currentConversation?.conversationType, selfUserID, loadState.initLoading]);
 
   const loadMoreMessage = () => {
     if (!loadState.hasMoreOld || moreOldLoading) return;
@@ -357,6 +492,7 @@ const ChatContent = () => {
           startReached={loadMoreMessage}
           ref={virtuoso}
           data={loadState.messageList}
+          context={{ messageList: loadState.messageList, dataVersion, firstItemIndex: loadState.firstItemIndex }}
           rangeChanged={(range) => {
             if (range) {
               setVisibleRange({ startIndex: range.startIndex, endIndex: range.endIndex });
@@ -401,8 +537,8 @@ const ChatContent = () => {
                   if (newSeqsToMark.length > 0) {
                     console.log("标记可见消息为已读:", {
                       conversationID,
-                      sessionType: currentConversation.sessionType,
-                      isGroup: currentConversation.sessionType === SessionType.Group,
+                      conversationType: currentConversation.conversationType,
+                      isGroup: currentConversation.conversationType === SessionType.Group,
                       msgCount: newSeqsToMark.length,
                       seqs: newSeqsToMark,
                       msgIDs: newMsgIDsToMark,
@@ -418,7 +554,7 @@ const ChatContent = () => {
                       });
 
                     // 群聊额外发送已读回执给消息发送者
-                    if (currentConversation.sessionType === SessionType.Group) {
+                    if (currentConversation.conversationType === SessionType.Group) {
                       console.log("群聊: 发送已读回执", {
                         conversationID,
                         clientMsgIDList: newMsgIDsToMark,
@@ -452,8 +588,33 @@ const ChatContent = () => {
                 </div>
               ) : null,
           }}
-          computeItemKey={(_, item) => item.clientMsgID}
-          itemContent={(_, message) => {
+          computeItemKey={(_, item, context) => {
+            // 使用顶层 _groupReadCount 触发重新渲染（模仿单聊的 isRead 字段）
+            const { dataVersion: ver } = context as { dataVersion: number };
+            const readCount = (item as any)._groupReadCount ?? item.attachedInfoElem?.groupHasReadInfo?.hasReadCount ?? 0;
+            return `${item.clientMsgID}-r${readCount}-v${ver}`;
+          }}
+          itemContent={(index, _message, context) => {
+            // 直接使用 latestLoadState.current 获取最新消息（绕过 Virtuoso 缓存）
+            const { dataVersion: ver } = context as { dataVersion: number };
+            // 使用 latestLoadState.current.firstItemIndex 确保一致性
+            const currentFirstItemIndex = latestLoadState.current?.firstItemIndex ?? 0;
+            const currentMessageList = latestLoadState.current?.messageList ?? [];
+            const actualIndex = index - currentFirstItemIndex;
+            const message = currentMessageList[actualIndex] || _message;
+
+            // 调试：检查消息数据
+            if (message.sendID === selfUserID && message.sessionType === 3) {
+              console.log("[itemContent] 渲染自己的群消息:", {
+                clientMsgID: message.clientMsgID?.slice(-8),
+                _groupReadCount: (message as any)._groupReadCount,
+                hasReadCount: message.attachedInfoElem?.groupHasReadInfo?.hasReadCount,
+                dataVersion: ver,
+                index,
+                actualIndex,
+              });
+            }
+
             if (SystemMessageTypes.includes(message.contentType)) {
               return (
                 <NotificationMessage key={message.clientMsgID} message={message} />
@@ -462,9 +623,12 @@ const ChatContent = () => {
             const isSender = selfUserID === message.sendID;
             const isHighlight = message.clientMsgID === highlightMsgID;
             const isFirstUnread = message.clientMsgID === firstUnreadMsgID;
+            // 使用顶层 _groupReadCount 作为 key 的一部分
+            const readCount = (message as any)._groupReadCount ?? message.attachedInfoElem?.groupHasReadInfo?.hasReadCount ?? 0;
+
             return (
               <MessageItem
-                key={`${message.clientMsgID}-${isFirstUnread ? 'unread' : 'read'}`}
+                key={`${message.clientMsgID}-r${readCount}-v${ver}`}
                 conversationID={conversationID}
                 message={message}
                 messageUpdateFlag={message.senderNickname + message.senderFaceUrl}
