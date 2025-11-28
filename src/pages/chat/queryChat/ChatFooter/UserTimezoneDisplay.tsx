@@ -22,24 +22,17 @@ export const UserTimezoneDisplay = ({
   const effectiveTimezone = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   useEffect(() => {
-    console.log('[UserTimezoneDisplay] 组件挂载，启动定时器, timezone:', timezone);
     // 每秒更新一次时间
     const timer = setInterval(() => {
-      const newTime = new Date();
-      console.log('[UserTimezoneDisplay] 定时器触发，更新时间:', newTime.toLocaleTimeString());
-      setCurrentTime(newTime);
-      setTickCount((prev) => prev + 1); // 强制触发重新渲染
+      setCurrentTime(new Date());
+      setTickCount((prev) => prev + 1);
     }, 1000);
 
-    return () => {
-      console.log('[UserTimezoneDisplay] 组件卸载，清理定时器');
-      clearInterval(timer);
-    };
-  }, [timezone]); // 添加timezone依赖，当timezone变化时重新创建定时器
+    return () => clearInterval(timer);
+  }, [timezone]);
 
   // 格式化时间显示（使用用户时区）
   const { date, time } = useMemo(() => {
-    console.log('[UserTimezoneDisplay] 重新计算时间格式, currentTime:', currentTime.toLocaleTimeString(), 'timezone:', timezone, 'tickCount:', tickCount);
     try {
       // 如果提供了时区，使用指定时区；否则使用浏览器本地时区
       const options: Intl.DateTimeFormatOptions = {

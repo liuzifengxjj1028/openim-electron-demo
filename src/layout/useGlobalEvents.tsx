@@ -494,6 +494,31 @@ export function useGlobalEvent() {
 
   // conversation
   const conversationChnageHandler = ({ data }: WSEvent<ConversationItem[]>) => {
+    const currentConversation = useConversationStore.getState().currentConversation;
+
+    // 修复：当用户正在查看某个会话时，SDK 可能会因为并发处理已读回执导致 unreadCount 计算错误
+    // 对于当前正在查看的会话，unreadCount 只能减少不能增加（因为用户正在阅读）
+    if (currentConversation) {
+      data = data.map(conv => {
+        if (conv.conversationID === currentConversation.conversationID) {
+          const currentUnreadCount = currentConversation.unreadCount || 0;
+          const newUnreadCount = conv.unreadCount || 0;
+
+          // 如果新的未读数大于当前值，说明 SDK 计算错误，使用当前较小的值
+          if (newUnreadCount > currentUnreadCount) {
+            console.log('[conversationChnageHandler] 检测到 unreadCount 异常增加，忽略:', {
+              conversationID: conv.conversationID,
+              currentUnreadCount,
+              newUnreadCount,
+              usingValue: currentUnreadCount,
+            });
+            return { ...conv, unreadCount: currentUnreadCount };
+          }
+        }
+        return conv;
+      });
+    }
+
     updateConversationList(data, "filter");
   };
   const newConversationHandler = ({ data }: WSEvent<ConversationItem[]>) => {

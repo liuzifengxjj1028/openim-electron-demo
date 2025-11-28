@@ -48,73 +48,45 @@ const ChatFooter: ForwardRefRenderFunction<unknown, unknown> = (_, ref) => {
     }
 
     const fetchOtherUserInfo = async () => {
-      // 用户ID到时区的映射表
-      const userTimezoneMap: Record<string, string> = {
-        '1558891557': 'America/Los_Angeles',  // TT - 洛杉矶时间
-        '4132941641': 'Asia/Shanghai',        // 其他用户 - 上海时间
-        // 可以继续添加其他用户的时区映射
-      };
-
       try {
         const response = await getBusinessUserInfo([currentConversation.userID]);
         console.log('[时区调试] API完整响应:', response);
-        console.log('[时区调试] API返回的data字段:', response.data);
 
         if (response.data.users && response.data.users.length > 0) {
-          let userInfo = response.data.users[0];
-          console.log('[时区调试] 获取到的用户信息完整对象:', userInfo);
-          console.log('[时区调试] 用户信息的所有字段:', Object.keys(userInfo));
-          console.log('[时区调试] timezone字段的值:', userInfo.timezone);
-          console.log('[时区调试] timezone字段类型:', typeof userInfo.timezone);
+          const userInfo = response.data.users[0];
+          console.log('[时区调试] 获取到的用户信息:', {
+            userID: userInfo.userID,
+            nickname: userInfo.nickname,
+            timezone: userInfo.timezone,
+            hasTimezone: !!userInfo.timezone,
+          });
 
-          // 如果后端没有返回timezone,使用本地配置的时区映射
-          if (!userInfo.timezone) {
-            // 查找用户的时区配置
-            const mappedTimezone = userTimezoneMap[userInfo.userID];
-
-            if (mappedTimezone) {
-              userInfo = {
-                ...userInfo,
-                timezone: mappedTimezone
-              };
-              console.log(`[时区映射] 用户 ${userInfo.userID} 使用配置的时区:`, mappedTimezone);
-            } else {
-              // 如果没有配置,使用默认时区(上海时间)
-              userInfo = {
-                ...userInfo,
-                timezone: 'Asia/Shanghai'
-              };
-              console.log(`[时区映射] 用户 ${userInfo.userID} 使用默认时区: Asia/Shanghai`);
-            }
-          }
-
+          // 直接使用API返回的数据，timezone可能为空（表示用户未设置时区）
+          // 如果用户未设置时区，UserTimezoneDisplay组件会使用浏览器本地时区
           setOtherUserInfo(userInfo);
+        } else {
+          console.log('[时区调试] API返回空用户列表');
+          setOtherUserInfo(null);
         }
       } catch (error) {
         console.error("获取对方用户信息失败:", error);
-
-        // API失败时,使用本地时区映射创建一个基本的用户信息对象
-        const mappedTimezone = userTimezoneMap[currentConversation.userID] || 'Asia/Shanghai';
-        const fallbackUserInfo = {
+        // API失败时，设置一个基本的用户信息对象（不设置timezone，让组件使用默认值）
+        setOtherUserInfo({
           userID: currentConversation.userID,
           nickname: currentConversation.showName || '',
-          timezone: mappedTimezone,
           faceURL: currentConversation.faceURL || '',
-        };
-
-        console.log('[时区映射-降级] API失败，使用本地配置创建用户信息:', fallbackUserInfo);
-        setOtherUserInfo(fallbackUserInfo);
+        } as BusinessUserInfo);
       }
     };
 
     // 立即获取一次用户信息
     fetchOtherUserInfo();
 
-    // 每30秒刷新一次用户信息，以便及时获取时区更新
+    // 每10秒刷新一次用户信息，以便及时获取时区更新
     const refreshInterval = setInterval(() => {
       console.log('[时区刷新] 定期刷新用户信息');
       fetchOtherUserInfo();
-    }, 30000); // 30秒
+    }, 10000); // 10秒，更快响应时区变化
 
     // 清理定时器
     return () => {
