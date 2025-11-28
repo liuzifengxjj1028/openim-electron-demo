@@ -24,7 +24,7 @@ export default defineConfig(({ command }) => {
     plugins: [
       react(),
       electron({
-        include: ["electron/main"],
+        include: ["electron/main", "electron/utils", "electron/constants", "electron/i18n"],
         transformOptions: {
           sourcemap,
         },

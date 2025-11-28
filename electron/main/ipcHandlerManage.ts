@@ -1,4 +1,4 @@
-import { BrowserWindow, Menu, app, dialog, ipcMain } from "electron";
+import { BrowserWindow, Menu, Notification, app, dialog, ipcMain, shell } from "electron";
 import {
   clearCache,
   closeWindow,
@@ -97,6 +97,49 @@ export const setIpcMainListener = () => {
       default:
         e.returnValue = global.pathConfig.publicPath;
         break;
+    }
+  });
+
+  // Notification settings
+  ipcMain.handle(IpcRenderToMain.openNotificationSettings, () => {
+    if (process.platform === "darwin") {
+      // macOS: Open System Settings -> Notifications
+      shell.openExternal("x-apple.systempreferences:com.apple.preference.notifications");
+    } else if (process.platform === "win32") {
+      // Windows: Open notification settings
+      shell.openExternal("ms-settings:notifications");
+    }
+    // Linux: No standard way to open notification settings
+  });
+
+  ipcMain.handle(IpcRenderToMain.testNotification, async () => {
+    try {
+      // Test if notifications can actually be shown
+      const notification = new Notification({
+        title: "通知测试",
+        body: "如果您看到这条通知，说明系统通知功能正常！",
+        silent: true,
+      });
+
+      return new Promise((resolve) => {
+        notification.on("show", () => {
+          setTimeout(() => notification.close(), 3000);
+          resolve({ success: true, shown: true });
+        });
+
+        notification.on("failed", (_, error) => {
+          resolve({ success: false, shown: false, error });
+        });
+
+        notification.show();
+
+        // Fallback: If no event fires, assume it didn't show
+        setTimeout(() => {
+          resolve({ success: false, shown: false, error: "Timeout" });
+        }, 1000);
+      });
+    } catch (error) {
+      return { success: false, shown: false, error: String(error) };
     }
   });
 };

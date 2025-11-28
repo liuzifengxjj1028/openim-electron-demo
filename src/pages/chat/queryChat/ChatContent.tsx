@@ -336,7 +336,8 @@ const ChatContent = () => {
         }];
 
         // 调用 HTTP API 获取最新消息数据
-        const response = await fetch("http://localhost:10002/msg/pull_msg_by_seq", {
+        const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:10002";
+        const response = await fetch(`${apiUrl}/msg/pull_msg_by_seq`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

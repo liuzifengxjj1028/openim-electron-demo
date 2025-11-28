@@ -14,4 +14,6 @@ export const IpcRenderToMain = {
   getKeyStoreSync: "getKeyStoreSync",
   showInputContextMenu: "showInputContextMenu",
   getDataPath: "getDataPath",
+  openNotificationSettings: "openNotificationSettings",
+  testNotification: "testNotification",
 };

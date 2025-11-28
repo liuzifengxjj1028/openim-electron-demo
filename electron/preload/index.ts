@@ -101,6 +101,14 @@ const saveFileToDisk = async ({
   return uniqueSavePath;
 };
 
+const openNotificationSettings = () => {
+  return ipcRenderer.invoke("openNotificationSettings");
+};
+
+const testNotification = () => {
+  return ipcRenderer.invoke("testNotification");
+};
+
 const Api: IElectronAPI = {
   getDataPath,
   getVersion: () => process.version,
@@ -113,6 +121,8 @@ const Api: IElectronAPI = {
   ipcSendSync,
   getFileByPath,
   saveFileToDisk,
+  openNotificationSettings,
+  testNotification,
 };
 
 contextBridge.exposeInMainWorld("electronAPI", Api);

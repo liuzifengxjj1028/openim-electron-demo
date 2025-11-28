@@ -8,6 +8,7 @@ import {
   GroupApplicationItem,
   GroupItem,
   GroupMemberItem,
+  GroupMessageReceiptInfo,
   MessageItem,
   ReceiptInfo,
   RevokedInfo,
@@ -243,6 +244,7 @@ export function useGlobalEvent() {
     IMSDK.on(CbEvents.OnRecvNewMessages, newMessageHandler);
     IMSDK.on(CbEvents.OnNewRecvMessageRevoked, revokedMessageHandler);
     IMSDK.on(CbEvents.OnRecvC2CReadReceipt, c2cReadReceiptHandler);
+    IMSDK.on(CbEvents.OnRecvGroupReadReceipt, groupReadReceiptHandler);
     // conversation
     IMSDK.on(CbEvents.OnConversationChanged, conversationChnageHandler);
     IMSDK.on(CbEvents.OnNewConversation, newConversationHandler);
@@ -345,7 +347,7 @@ export function useGlobalEvent() {
   };
 
   const c2cReadReceiptHandler = ({ data }: WSEvent<ReceiptInfo[]>) => {
-    console.log('[已读回执] 收到已读回执:', data);
+    console.log('[已读回执] 收到单聊已读回执:', data);
     data.forEach((receipt) => {
       receipt.msgIDList.forEach((clientMsgID) => {
         console.log('[已读回执] 更新消息已读状态:', clientMsgID);
@@ -354,6 +356,41 @@ export function useGlobalEvent() {
           isRead: true,
         } as MessageItem);
       });
+    });
+  };
+
+  const groupReadReceiptHandler = ({ data }: WSEvent<GroupMessageReceiptInfo>) => {
+    console.log('[群聊已读回执] ===== 收到群聊已读回执 =====', data);
+    const { conversationID, groupMessageReadInfo } = data;
+
+    // 检查是否是当前会话
+    const currentConversation = useConversationStore.getState().currentConversation;
+    console.log('[群聊已读回执] 当前会话:', currentConversation?.conversationID, '接收到的会话:', conversationID);
+    if (!currentConversation || currentConversation.conversationID !== conversationID) {
+      console.log('[群聊已读回执] ⚠️ 不是当前会话，跳过');
+      return;
+    }
+
+    // 更新每条消息的已读信息
+    groupMessageReadInfo.forEach((readInfo) => {
+      console.log('[群聊已读回执] 更新消息已读状态:', {
+        clientMsgID: readInfo.clientMsgID,
+        hasReadCount: readInfo.hasReadCount,
+        unreadCount: readInfo.unreadCount,
+      });
+
+      // 更新消息的 attachedInfoElem.groupHasReadInfo
+      updateOneMessage({
+        clientMsgID: readInfo.clientMsgID,
+        attachedInfoElem: {
+          groupHasReadInfo: {
+            hasReadCount: readInfo.hasReadCount,
+            unreadCount: readInfo.unreadCount,
+            hasReadUserIDList: readInfo.readMembers?.map(m => m.userID) || [],
+            groupMemberCount: (readInfo.hasReadCount || 0) + (readInfo.unreadCount || 0) + 1, // +1 for sender
+          },
+        },
+      } as unknown as MessageItem);
     });
   };
 
@@ -579,6 +616,7 @@ export function useGlobalEvent() {
     // message
     IMSDK.off(CbEvents.OnRecvNewMessages, newMessageHandler);
     IMSDK.off(CbEvents.OnRecvC2CReadReceipt, c2cReadReceiptHandler);
+    IMSDK.off(CbEvents.OnRecvGroupReadReceipt, groupReadReceiptHandler);
     // conversation
     IMSDK.off(CbEvents.OnConversationChanged, conversationChnageHandler);
     IMSDK.off(CbEvents.OnNewConversation, newConversationHandler);
